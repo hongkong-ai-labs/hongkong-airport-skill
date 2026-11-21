@@ -57,12 +57,37 @@ times, or a per-flight air-traffic-control transcript. See
 
 ### Agent skill
 
-Installs `SKILL.md` plus a script that fetches the matching binary, so an agent
-can answer HKG flight questions with nothing else wired up:
+The skill teaches an agent when to use the CLI or call the MCP tools. It needs
+the `hkia` binary at runtime; `scripts/ensure-binary.sh` finds or installs it.
+
+Official skills CLI (Node.js 22.20+):
 
 ```bash
 npx skills add hongkong-ai-labs/hongkong-airport-skill
 ```
+
+Rust-only alternative ([community `skills-cli`](https://crates.io/crates/skills-cli),
+not maintained by this project):
+
+```bash
+cargo install skills-cli --locked
+skills add hongkong-ai-labs/hongkong-airport-skill
+```
+
+Manual install without either CLI:
+
+```bash
+git clone --depth 1 https://github.com/hongkong-ai-labs/hongkong-airport-skill /tmp/hkia-skill
+mkdir -p .agents/skills
+cp -R /tmp/hkia-skill .agents/skills/hongkong-airport-skill
+rm -rf .agents/skills/hongkong-airport-skill/.git
+
+bash .agents/skills/hongkong-airport-skill/scripts/ensure-binary.sh
+```
+
+Use `~/.agents/skills` instead of `.agents/skills` for a user-wide install.
+Claude Code also reads `~/.claude/skills`; other agents use their own skills
+directory. `.agents/skills` is the portable layout used by both skills CLIs.
 
 Before first use, the skill runs `scripts/ensure-binary.sh`. It checks
 `$HKIA_BIN`, then `hkia` on `PATH`, then `scripts/install.sh`, then a local
@@ -113,12 +138,48 @@ docker run --rm -p 8787:8787 \
   hkia mcp --transport http --host 0.0.0.0 --port 8787
 ```
 
+For a stdio MCP client, use the container as the server process:
+
+```bash
+docker run --rm -i -v hkia-data:/data hkia mcp
+```
+
 Or `docker compose up --build`. The compose file exposes port 8787 and mounts
 named volumes for the SQLite store and watchlist. If you publish the image,
 set `HKIA_AUTH_TOKEN` before exposing it beyond localhost.
 
-The skill teaches an agent when to call the CLI or MCP tools, how to read
-terminal/gate guidance, and which claims the data does not support.
+## Run modes
+
+One binary covers interactive use, scripts, live watching, MCP clients, and
+containers. The skill is optional; it teaches an agent which mode to use.
+
+| Mode | Start with | Best for |
+| --- | --- | --- |
+| CLI table | `hkia departures` | Reading a board in a terminal |
+| JSON | `hkia departures --json` | `jq`, scripts, other programs |
+| CSV | `hkia departures --csv` | Spreadsheets and data pipelines |
+| Watch | `hkia watch --interval 60` | Change-only output and alerts |
+| MCP stdio | `hkia mcp` | Desktop and CLI MCP clients that launch a process |
+| MCP HTTP | `hkia mcp --transport http` | One long-lived server for several clients |
+| MCP SSE | `hkia mcp --transport sse` | Clients that only support legacy SSE |
+| Docker | `docker run --rm hkia departures` | No local Rust install |
+| Agent skill | `SKILL.md` from the install section | Teaching an agent when to use the tool |
+
+The same board in three styles:
+
+```bash
+hkia departures --limit 5
+hkia departures --limit 5 --json | jq '.flights[] | {flight_number, status}'
+hkia departures --limit 5 --csv
+```
+
+For MCP, the transport changes how the client connects, not the tools or data:
+
+```bash
+hkia mcp                                   # stdio
+hkia mcp --transport http --port 8787      # http://127.0.0.1:8787/mcp
+hkia mcp --transport sse --port 8787       # http://127.0.0.1:8787/sse
+```
 
 ## CLI
 
@@ -314,6 +375,37 @@ If `hkia` is not on the MCP client's `PATH`, replace `"command": "hkia"` with
 an absolute path. `scripts/ensure-binary.sh` prints the path to use. Restart the
 client after changing its MCP configuration.
 
+#### Client setup
+
+Claude Code and Codex can write the stdio entry themselves:
+
+```bash
+claude mcp add hkia -- /absolute/path/to/hkia mcp
+codex mcp add hkia -- /absolute/path/to/hkia mcp
+```
+
+Cursor reads `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (user).
+Claude Desktop uses `claude_desktop_config.json` in its application-support
+directory. Paste the `mcpServers` block above into either file and restart the
+client.
+
+[`add-mcp`](https://add-mcp.com) is the closest equivalent to `npx skills add`
+for MCP servers: it detects supported clients and writes the correct config for
+each one.
+
+```bash
+npx add-mcp /absolute/path/to/hkia --args mcp --name hkia \
+  -a cursor -a claude-code -y
+
+# HTTP transport instead of stdio
+npx add-mcp http://127.0.0.1:8787/mcp --name hkia \
+  -a cursor -a claude-code -y
+```
+
+Use `$(command -v hkia)` in place of the path when `hkia` is already on
+`PATH`. `add-mcp` is a third-party Node.js tool; the JSON above works without
+it.
+
 ### Streamable HTTP
 
 ```bash
@@ -372,6 +464,21 @@ Protected routes require `Authorization: Bearer $SECRET`. Requests are limited
 to 240 per minute by default across the process (`--rate-limit 0` disables,
 `--rate-limit N` changes the cap); over-limit requests receive HTTP 429 with
 `Retry-After: 60`. This is a single-process guard, not a multi-tenant quota.
+
+```json
+{
+  "mcpServers": {
+    "hkia": {
+      "type": "http",
+      "url": "http://127.0.0.1:8787/mcp",
+      "headers": { "Authorization": "Bearer <token>" }
+    }
+  }
+}
+```
+
+Keep the token in your client's secret store or an environment variable where
+the client supports interpolation; do not commit it to a shared config file.
 
 ### Tools
 

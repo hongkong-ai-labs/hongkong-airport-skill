@@ -6,6 +6,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Manual no-Node skill installation, a community Rust `skills-cli` path, and a
+  run-mode overview covering CLI, JSON, CSV, watch, Docker and MCP transports.
+- MCP client setup examples for Claude Code, Codex, Cursor, authenticated HTTP
+  and the third-party `add-mcp` config helper.
+
 ## [0.1.0] - 2026-11-21
 
 ### Added

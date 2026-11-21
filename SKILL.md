@@ -45,6 +45,18 @@ Skill only (teaches the agent to use the CLI):
 npx skills add hongkong-ai-labs/hongkong-airport-skill
 ```
 
+Rust-only alternative (community port):
+
+```bash
+cargo install skills-cli --locked
+skills add hongkong-ai-labs/hongkong-airport-skill
+```
+
+Manual install: copy this directory, or just `SKILL.md` plus `scripts/`, into
+the agent's skills directory (for example `.agents/skills/hongkong-airport-skill`
+or `~/.claude/skills/hongkong-airport-skill`). Then run
+`scripts/ensure-binary.sh` from that directory.
+
 The binary (choose one):
 
 ```bash
@@ -52,6 +64,22 @@ sh scripts/install.sh            # from the skill directory; checksum-verified
 cargo install --path .            # from a clone of this repo
 cargo install --git https://github.com/hongkong-ai-labs/hongkong-airport-skill --bin hkia --locked
 ```
+
+## Run modes
+
+Use the CLI for one-shot queries and MCP when a client should call tools
+directly. The transport changes how a client connects, not the data or tools.
+
+| Mode | Start with | Use for |
+| --- | --- | --- |
+| CLI table | `hkia departures` | Human-readable board |
+| JSON | `hkia departures --json` | Parsing and summarising |
+| CSV | `hkia departures --csv` | Spreadsheet or pipeline output |
+| Watch | `hkia watch --interval 60` | Change-only output |
+| MCP stdio | `hkia mcp` | Client launches the process |
+| MCP HTTP | `hkia mcp --transport http` | Shared long-lived server |
+| MCP SSE | `hkia mcp --transport sse` | Legacy SSE clients |
+| Docker | `docker run --rm hkia departures` | No local binary |
 
 ## CLI
 
@@ -220,7 +248,16 @@ If `hkia` is not on the MCP client's `PATH`, use the absolute path printed by
 `scripts/ensure-binary.sh` as `command`. Restart the client after editing its
 configuration.
 
-For HTTP, point the client at `http://127.0.0.1:8787/mcp`; for SSE, use
+Claude Code and Codex can register the stdio server themselves:
+
+```bash
+claude mcp add hkia -- /absolute/path/to/hkia mcp
+codex mcp add hkia -- /absolute/path/to/hkia mcp
+```
+
+`npx add-mcp /absolute/path/to/hkia --args mcp --name hkia -a claude-code -y`
+is a third-party helper that writes the same entry for many clients. For HTTP,
+point the client at `http://127.0.0.1:8787/mcp`; for SSE, use
 `http://127.0.0.1:8787/sse` (messages are POSTed to the endpoint URL the server
 sends in the `endpoint` event). `GET /health` is available on both network
 transports. `--path` changes the streamable HTTP endpoint.
