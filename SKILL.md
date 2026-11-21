@@ -211,6 +211,10 @@ hkia access bus --route A11
 hkia access bus --route A11 --direction from-airport --no-live
 hkia access bus --csv
 hkia access trip --station KOW --airline CX --time 07:40 --terminal T1 --buffer 15
+
+# Runway in use
+hkia runway
+hkia runway --json
 ```
 
 - `ael` is **live** from the MTR Next Train API. Stations: `HOK`, `KOW`, `TSY`,
@@ -240,6 +244,23 @@ The reference snapshot was checked on `2026-11-22`. Always pass through
 `checked_on` and the source URL, and tell the user to confirm with MTR, the
 airline, or the bus operator before travel. `scripts/refresh_access_data.py
 --check` verifies the snapshots against the official sources.
+
+## Runway in use
+
+`hkia runway` reports the runway in use for arrivals and departures, the ATIS
+letter and issue time, and the airport wind with computed head/tailwind and
+crosswind for the arrival runway. The source is the official CAD ATIS page on
+`hkatc.gov.hk`, not a guess from wind.
+
+- Runway `07` means aircraft land heading eastbound, approaching from the west;
+  runway `25` means westbound approaches from the east. Use this for questions
+  about which side aircraft are coming in over, or aircraft noise.
+- Arrivals and departures can use different runways; report both.
+- Runway 07 is preferred when the tailwind is 5 knots or less (AIP VHHH
+  AD 2.22), but ATC can use 25 when required. Do not predict the runway from
+  wind when the ATIS is available.
+- The ATIS page can be briefly unavailable while a bulletin updates; say so
+  instead of inventing a runway.
 
 ## Watchlist and notifications
 
@@ -317,8 +338,9 @@ point the client at `http://127.0.0.1:8787/mcp`; for SSE, use
 sends in the `endpoint` event). `GET /health` is available on both network
 transports. `--path` changes the streamable HTTP endpoint.
 
-For non-loopback use, set a bearer token with `--auth-token` or
-`HKIA_AUTH_TOKEN`; requests then need `Authorization: Bearer <token>`.
+For non-loopback use, set an API key with `--api-key` (alias `--auth-token`)
+or `HKIA_MCP_API_KEY`; requests then need `Authorization: Bearer <key>` or
+`X-API-Key: <key>`. `HKIA_API_KEY` and `HKIA_AUTH_TOKEN` are aliases.
 `--rate-limit` caps HTTP/SSE requests per minute (default 240, `0` disables).
 The server has no TLS of its own and uses one shared static token; bind loopback
 or terminate TLS at a reverse proxy before exposing it.
@@ -339,6 +361,8 @@ MCP tools:
   `in-town-checkin`, `airport-bus`, `trip` (`station`, `direction`, `airline`,
   `route`, `time`, `date`, `terminal`, `buffer_minutes`, `no_live`)
 - `get_weather` — current Hong Kong Observatory warnings
+- `get_runway_status` — runway in use for arrivals/departures, ATIS wind and
+  wind components, no arguments
 
 Most flight tools take `date`, `direction`, `cargo`, and `lang`; check the tool
 schema for exact parameter names.
@@ -352,6 +376,7 @@ MCP resources:
 - `hkia://access/ael/HOK` (any station code)
 - `hkia://access/checkin/CX` (any airline code)
 - `hkia://access/bus/A11` (any A-route)
+- `hkia://runway/status`
 
 Resources are JSON and support read plus legacy subscribe/unsubscribe; updates
 are polled every 30 seconds. Prefer `wait_for_changes` for push-style clients.
@@ -382,6 +407,9 @@ are polled every 30 seconds. Prefer `wait_for_changes` for push-style clients.
   cause, or recommendation to rebook. The trip planner's output is a plan based
   on published timetables and the stated buffer, not a guarantee of on-time
   arrival.
+- Never invent a runway. Quote the ATIS arrival/departure runways separately.
+  The approach side follows from the runway designator; it is not an observed
+  flight track, and runway use can change at any time.
 - The live feed may include the previous day's tail; this tool selects the
   requested date. Keep request rates reasonable; responses cache for 20 seconds
   by default (`--cache-ttl 0` disables, `watch` is uncached).

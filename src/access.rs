@@ -1669,6 +1669,67 @@ pub fn bus_csv(response: &BusResponse, header: bool) -> Result<String> {
     finish_csv(writer)
 }
 
+pub fn trip_csv(response: &AelTrip, header: bool) -> Result<String> {
+    let mut writer = csv::Writer::from_writer(Vec::new());
+    if header {
+        writer.write_record([
+            "station",
+            "airline",
+            "flight_date",
+            "flight_departure_at",
+            "terminal",
+            "airport_arrival_deadline",
+            "latest_departure",
+            "arrival_at_airport",
+            "available",
+            "check_in_cutoff_minutes",
+            "buffer_minutes",
+            "journey_minutes",
+            "headway_minutes",
+            "in_town_checkin_hours",
+            "checked_on",
+        ])?;
+    }
+    writer.write_record([
+        response.station.code.to_string(),
+        response
+            .airline
+            .as_ref()
+            .map(|airline| airline.iata.clone())
+            .unwrap_or_default(),
+        response.flight.date.clone(),
+        response.flight.departure_at.clone(),
+        response.flight.terminal.clone().unwrap_or_default(),
+        response.airport_arrival_deadline.clone(),
+        response.latest_departure.clone().unwrap_or_default(),
+        response.arrival_at_airport.clone().unwrap_or_default(),
+        response.available.to_string(),
+        response.assumptions.check_in_cutoff_minutes.to_string(),
+        response.assumptions.buffer_minutes.to_string(),
+        response.assumptions.journey_minutes.to_string(),
+        response.assumptions.headway_minutes.to_string(),
+        response.in_town_checkin_hours.clone().unwrap_or_default(),
+        response.checked_on.clone(),
+    ])?;
+    finish_csv(writer)
+}
+
+pub fn status_csv(status: &AelStatus, header: bool) -> Result<String> {
+    let mut writer = csv::Writer::from_writer(Vec::new());
+    if header {
+        writer.write_record(["station", "delayed", "checked_at", "message"])?;
+    }
+    for station in &status.stations {
+        writer.write_record([
+            station.station.to_string(),
+            station.delayed.to_string(),
+            status.checked_at.clone(),
+            status.message.clone(),
+        ])?;
+    }
+    finish_csv(writer)
+}
+
 fn finish_csv(writer: csv::Writer<Vec<u8>>) -> Result<String> {
     let bytes = writer
         .into_inner()
@@ -1846,5 +1907,35 @@ mod tests {
             time_part(trip.latest_departure.as_deref().unwrap()),
             "07:23"
         );
+    }
+
+    #[test]
+    fn status_csv_lists_each_station() {
+        let generated_at = "2026-11-22T00:00:00+08:00".to_string();
+        let status = AelStatus {
+            mode: "airport_express_status",
+            delayed: true,
+            checked_at: generated_at.clone(),
+            stations: vec![
+                AelStationStatus {
+                    station: "HOK",
+                    delayed: false,
+                    generated_at: generated_at.clone(),
+                },
+                AelStationStatus {
+                    station: "AIR",
+                    delayed: true,
+                    generated_at,
+                },
+            ],
+            errors: Vec::new(),
+            message: "MTR reports an Airport Express delay.".to_string(),
+            source: source("MTR Next Train API", AEL_API_SOURCE),
+        };
+        let csv = status_csv(&status, true).unwrap();
+        assert!(csv.starts_with("station,delayed,checked_at,message"));
+        assert_eq!(csv.lines().count(), 3);
+        assert!(csv.contains("AIR,true"));
+        assert!(status_csv(&status, false).unwrap().lines().count() == 2);
     }
 }

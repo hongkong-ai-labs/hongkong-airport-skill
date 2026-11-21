@@ -25,6 +25,7 @@ the HKIA app and website — and turns it into:
 - historical on-time analytics for the feed's D-91 to D+14 window
 - live Airport Express trains and delay status, a trip planner, in-town check-in
   reference, and A-route bus data with live ETAs
+- the runway in use with the airport wind and computed wind components
 - an installable agent skill (`SKILL.md`)
 
 No API key, no scraping, no browser automation.
@@ -146,6 +147,15 @@ For a stdio MCP client, use the container as the server process:
 docker run --rm -i -v hkia-data:/data hkia mcp
 ```
 
+Apple's `container` runtime uses the same OCI image:
+
+```bash
+container build -t hkia .
+container run --rm hkia departures --limit 10
+container run --rm -p 8787:8787 -e HKIA_MCP_API_KEY="$SECRET" \
+  hkia mcp --transport http --host 0.0.0.0 --port 8787
+```
+
 Or `docker compose up --build`. The compose file exposes port 8787 and mounts
 named volumes for the SQLite store and watchlist. If you publish the image,
 set `HKIA_AUTH_TOKEN` before exposing it beyond localhost.
@@ -239,6 +249,7 @@ the complete flag set, including per-command filters such as `--flight`,
 | `stats` | Single-day stats, or historical range analytics |
 | `history <number>` | Locally observed status/gate timeline |
 | `access` | `ael`, `status`, `checkin`, `bus`, `trip` airport-access queries |
+| `runway` | Runway in use for arrivals and departures, with the airport wind |
 | `watchlist` | `show`, `add`, `remove`, `set`, `clear` |
 | `mcp` | MCP server over stdio, HTTP, or SSE |
 
@@ -389,6 +400,10 @@ hkia access bus --csv
 
 hkia access trip --airline CX --time 23:59 --date tomorrow
 hkia access trip --station KOW --airline CX --time 07:40 --terminal T1 --buffer 15 --json
+
+hkia runway                            # arrival/departure runway in use
+hkia runway --json
+hkia runway --csv
 ```
 
 `ael` is live: it reads the MTR Next Train API through data.gov.hk and returns
@@ -437,6 +452,33 @@ URLs. Use `--json` or `--csv` for scripts; `--no-header` omits the CSV header.
 `--check` compares them with the official sources without updating anything. A
 scheduled GitHub Actions workflow runs the check weekly and opens an issue when
 the data drifts.
+
+## Runway in use
+
+`hkia runway` answers which direction aircraft are landing and departing. It
+reads the Civil Aviation Department's public ATIS page on `hkatc.gov.hk`, which
+is the official runway-in-use broadcast, and reports the arrival and departure
+runway separately along with the ATIS letter and issue time.
+
+```bash
+hkia runway
+hkia runway --json
+hkia runway --csv
+```
+
+The output also gives the airport wind from the ATIS and the computed
+head/tailwind and crosswind components for the arrival runway, plus the approach
+side implied by the runway designator: runway 07 means aircraft land heading
+eastbound, approaching from the west, while runway 25 means the opposite. This
+is what residents around the flight paths usually want when asking whether
+aircraft are coming in over their side of the airport.
+
+Runway 07 is preferred at HKG whenever the tailwind component is 5 knots or less
+(AIP VHHH AD 2.22), but ATC can use runway 25 when required, and arrivals and
+departures can differ. The tool therefore reports the ATIS statement rather than
+predicting from wind. Wind components are derived from the reported wind, not
+threshold measurements, and the ATIS page can be briefly unavailable while a
+bulletin updates.
 
 ## MCP
 
@@ -538,11 +580,14 @@ before exposing it to another machine.
 ### Auth and rate limiting
 
 ```bash
-hkia mcp --transport http --auth-token "$SECRET"
-# or: HKIA_AUTH_TOKEN="$SECRET" hkia mcp --transport http
+hkia mcp --transport http --api-key "$SECRET"
+# --auth-token is an alias; either env var works:
+# HKIA_MCP_API_KEY="$SECRET" hkia mcp --transport http
+# HKIA_AUTH_TOKEN="$SECRET" hkia mcp --transport http
 ```
 
-Protected routes require `Authorization: Bearer $SECRET`. Requests are limited
+Protected routes require `Authorization: Bearer $SECRET` or
+`X-API-Key: $SECRET`. Requests are limited
 to 240 per minute by default across the process (`--rate-limit 0` disables,
 `--rate-limit N` changes the cap); over-limit requests receive HTTP 429 with
 `Retry-After: 60`. This is a single-process guard, not a multi-tenant quota.
@@ -576,6 +621,7 @@ the client supports interpolation; do not commit it to a shared config file.
 | `get_historical_stats` | Multi-day range analytics with airline/route/hour/weekday groups |
 | `wait_for_changes` | Long-poll for new recorded changes; use the returned timestamp as the next `after` |
 | `get_weather` | Current Hong Kong Observatory warnings |
+| `get_runway_status` | Runway in use for arrivals and departures, ATIS wind and wind components |
 | `get_airport_access` | Live AEL trains and status, trip planning, dated in-town check-in hours, or A-route bus data with live ETAs |
 
 Watchlist and history tools use the local SQLite store and config, so the same
@@ -597,6 +643,7 @@ names.
 | `hkia://access/ael/HOK` | Live AEL departures, fares and journey times (use any station code) |
 | `hkia://access/checkin/CX` | Dated in-town check-in hours (use any airline code) |
 | `hkia://access/bus/A11` | Dated A-route windows and fares plus live ETAs (use any route) |
+| `hkia://runway/status` | Official ATIS runway in use and airport wind |
 
 Resources support read and the legacy subscribe/unsubscribe flow. Subscriptions
 poll every 30 seconds and emit `notifications/resources/updated` when the
@@ -625,7 +672,7 @@ serialized resource changes. For reliable push-style integrations, prefer
 | --- | --- |
 | `HKIA_API_BASE` | Override the feed base URL (default `https://www.hongkongairport.com/flightinfo-rest/rest`) |
 | `HKIA_WEATHER_URL` | Override the HKO warning endpoint |
-| `HKIA_AUTH_TOKEN` | Bearer token for HTTP/SSE MCP |
+| `HKIA_MCP_API_KEY` | API key for HTTP/SSE MCP (`HKIA_API_KEY` and `HKIA_AUTH_TOKEN` are aliases) |
 | `HKIA_DATA_DIR` | Directory containing `hkia.db` |
 | `HKIA_CONFIG` | Watchlist TOML path |
 
@@ -652,6 +699,10 @@ serialized resource changes. For reliable push-style integrations, prefer
   frequency guarantees, and live ETAs cover the terminus stop only. The trip
   planner uses the 90-minute cutoff, an explicit buffer and the published
   journey time; it does not model security, immigration or walking time.
+- Runway in use is live from the CAD ATIS. It is the official broadcast, but it
+  changes with wind and operations, arrivals and departures can use different
+  runways, and the ATIS can be briefly unavailable while updating. The approach
+  side is derived from the runway designator, not from observed flight tracks.
 - Responses are cached for 20 seconds (`--cache-ttl 0` disables it; `watch` is
   uncached). Delay/alert data is only as fresh as the airport feed itself; the
   project makes no uptime or freshness guarantee.
@@ -686,10 +737,11 @@ cargo test --all --locked
 Tests cover status parsing, midnight rollover, cancellations, codeshares,
 filters, stats/alerts, the captured board fixture, watchlist matching and
 dedupe, SQLite change detection and notification dedupe, weather parsing, AEL
-parsing and trip planning, bus data, and TOML round-tripping. Integration tests
-exercise the access CLI JSON shapes, station/direction errors, MCP tool mode
-routing and MCP access resources. CI runs formatting, clippy, tests, a release build and a
-SKILL.md/script validation job. Tagged releases verify the tag against
+parsing and trip planning, bus data, ATIS parsing and wind components, and TOML
+round-tripping. Integration tests exercise the access CLI JSON/CSV shapes,
+station/direction errors, MCP tool mode routing and MCP access/runway
+resources. CI runs formatting, clippy, tests, the access data drift check, a
+release build and a SKILL.md/script validation job. Tagged releases verify the tag against
 `Cargo.toml` and `CHANGELOG.md`, build macOS and static Linux binaries, smoke
 test the native artifact, and publish `SHA256SUMS`.
 
@@ -697,7 +749,8 @@ Layout: `src/api.rs` (feed client, normalisation, delays, alerts, stats),
 `src/analytics.rs` (historical ranges), `src/store.rs` (SQLite),
 `src/watchlist.rs` (config and matching), `src/notify.rs` (desktop/webhook),
 `src/weather.rs` (HKO), `src/access.rs` (AEL and bus live clients, trip planner
-and dated reference data), `src/render.rs` (tables/CSV), `src/mcp.rs`
+and dated reference data), `src/runway.rs` (CAD ATIS runway and wind),
+`src/render.rs` (tables/CSV), `src/mcp.rs`
 (transports, tools, resources), `src/main.rs` (CLI), `scripts/install.sh`
 (release installer), `scripts/ensure-binary.sh` (agent resolver),
 `scripts/refresh_access_data.py` (access data generator/checker), and `SKILL.md`
@@ -707,8 +760,9 @@ and dated reference data), `src/render.rs` (tables/CSV), `src/mcp.rs`
 
 Airport and airline reference data is embedded from OurAirports (public domain)
 and OpenFlights (ODbL). Airport Express, in-town check-in and A-route bus
-reference facts come from MTR and HKIA pages listed in [NOTICE](NOTICE). Flight
-data and the live train feed remain subject to their providers' terms; this
+reference facts come from MTR and HKIA pages listed in [NOTICE](NOTICE), and the
+runway/ATIS data comes from the Civil Aviation Department. Flight data, the live
+train feed and the ATIS page remain subject to their providers' terms; this
 project only reads the public endpoints.
 
 ## Licence

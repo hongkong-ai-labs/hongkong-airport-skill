@@ -177,6 +177,31 @@ fn trip_planner_keeps_the_buffer_explicit() {
 }
 
 #[test]
+fn trip_planner_outputs_csv() {
+    let (ok, stdout, stderr) = run(&[
+        "--csv",
+        "access",
+        "trip",
+        "--station",
+        "HOK",
+        "--airline",
+        "CX",
+        "--time",
+        "23:59",
+        "--date",
+        "tomorrow",
+    ]);
+    assert!(ok, "trip CSV failed: {stderr}");
+    let header = stdout.lines().next().unwrap_or_default();
+    assert!(
+        header.starts_with("station,airline,flight_date"),
+        "header: {header}"
+    );
+    let row = stdout.lines().nth(1).unwrap_or_default();
+    assert!(row.starts_with("HOK,CX,"), "row: {row}");
+}
+
+#[test]
 fn trip_planner_rejects_airport_side_stations() {
     let (ok, _, stderr) = run(&[
         "access",
@@ -320,6 +345,23 @@ fn mcp_routes_access_modes_and_resources() {
         .collect::<Vec<_>>();
     assert!(names.contains(&"get_airport_access"), "tools: {names:?}");
     assert!(names.contains(&"get_alerts"), "tools: {names:?}");
+    assert!(names.contains(&"get_runway_status"), "tools: {names:?}");
+
+    let resources = mcp.call(11, "resources/list", serde_json::json!({}));
+    let uris = resources["result"]["resources"]
+        .as_array()
+        .expect("resources list")
+        .iter()
+        .filter_map(|resource| resource["uri"].as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        uris.contains(&"hkia://runway/status"),
+        "resources: {uris:?}"
+    );
+    assert!(
+        uris.contains(&"hkia://access/ael/status"),
+        "resources: {uris:?}"
+    );
 
     let checkin =
         tool_payload(&mcp.tool(3, serde_json::json!({ "mode": "checkin", "airline": "CX" })));

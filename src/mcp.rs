@@ -44,6 +44,7 @@ use crate::api::{
     self, Client, Direction, Flight, FlightFilter, SortKey, build_alerts, compute_stats,
     fetch_flights,
 };
+use crate::runway;
 use crate::store::{Store, StoredEvent};
 use crate::watchlist::Config;
 use crate::weather::WeatherClient;
@@ -1139,6 +1140,14 @@ impl HkiaServer {
     }
 
     #[tool(
+        description = "Get the runway in use at HKG from the official CAD ATIS, with the current airport wind and computed head/tailwind and crosswind for the arrival runway. Use for questions about which direction aircraft are landing or departing from, or aircraft noise near the airport."
+    )]
+    async fn get_runway_status(&self) -> Result<String, ErrorData> {
+        let status = runway::fetch().await.map_err(mcp_error)?;
+        Ok(serde_json::to_string_pretty(&status).unwrap_or_else(|_| "{}".to_string()))
+    }
+
+    #[tool(
         description = "Get airport access for HKG: live Airport Express trains and delay status, dated MTR in-town check-in hours for an airline, dated HKIA A-route bus windows and fares with live operator ETAs for a single route, or the latest Airport Express departure for a flight (mode=trip with time, station, date, airline, buffer_minutes). Check-in, fare and bus facts carry checked_on and source fields; they are reference data, not live availability."
     )]
     async fn get_airport_access(
@@ -1288,6 +1297,10 @@ impl HkiaServer {
                 let response = access::checkin(airline);
                 Ok(serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".to_string()))
             }
+            ["runway", "status"] => {
+                let status = runway::fetch().await.map_err(mcp_error)?;
+                Ok(serde_json::to_string_pretty(&status).unwrap_or_else(|_| "{}".to_string()))
+            }
             ["access", "bus", route] => {
                 let direction = access::BusDirection::Both;
                 let mut response =
@@ -1320,7 +1333,7 @@ impl ServerHandler for HkiaServer {
         )
         .with_server_info(Implementation::new("hkia", "0.1.0"))
         .with_instructions(
-            "Live Hong Kong International Airport (HKG) flight data. All times are Hong Kong time (UTC+8). Resources: hkia://board/today/departures, hkia://board/today/arrivals, hkia://alerts/today, hkia://access/ael/status, hkia://access/ael/HOK, hkia://access/checkin/CX, hkia://access/bus/A11.",
+            "Live Hong Kong International Airport (HKG) flight data. All times are Hong Kong time (UTC+8). Resources: hkia://board/today/departures, hkia://board/today/arrivals, hkia://alerts/today, hkia://access/ael/status, hkia://access/ael/HOK, hkia://access/checkin/CX, hkia://access/bus/A11, hkia://runway/status.",
         )
     }
 
@@ -1350,6 +1363,11 @@ impl ServerHandler for HkiaServer {
             Resource::new("hkia://access/checkin/CX", "In-town check-in for CX")
                 .with_description(
                     "Replace CX with an airline IATA/ICAO code for dated MTR check-in hours",
+                )
+                .with_mime_type("application/json"),
+            Resource::new("hkia://runway/status", "Runway in use at HKG")
+                .with_description(
+                    "Official CAD ATIS arrival and departure runway with airport wind",
                 )
                 .with_mime_type("application/json"),
             Resource::new("hkia://access/bus/A11", "Airport bus A11")

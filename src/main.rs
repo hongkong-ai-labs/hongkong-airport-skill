@@ -5,6 +5,7 @@ mod mcp;
 mod notify;
 mod reference;
 mod render;
+mod runway;
 mod store;
 mod watchlist;
 mod weather;
@@ -108,6 +109,8 @@ enum Command {
     History(HistoryArgs),
     /// Airport Express trains, status and trip planning, in-town check-in and buses
     Access(AccessArgs),
+    /// Which runway is in use, with the airport wind
+    Runway,
     /// Manage the targeted watchlist config
     Watchlist(WatchlistArgs),
     /// Run the MCP server over stdio, streamable HTTP or SSE
@@ -504,6 +507,9 @@ async fn main() -> Result<()> {
         Command::Access(ref args) => {
             run_access(&cli, args).await?;
         }
+        Command::Runway => {
+            run_runway(&cli).await?;
+        }
         Command::Watchlist(ref args) => {
             run_watchlist(&cli, args)?;
         }
@@ -571,9 +577,6 @@ async fn run_access(cli: &Cli, args: &AccessArgs) -> Result<()> {
             }
         }
         AccessCommand::Trip(trip) => {
-            if cli.csv {
-                bail!("--csv is not supported for `access trip`");
-            }
             let station = access::parse_station(&trip.station).ok_or_else(|| {
                 anyhow::anyhow!("unknown station '{}'; use HOK, KOW or TSY", trip.station)
             })?;
@@ -590,22 +593,35 @@ async fn run_access(cli: &Cli, args: &AccessArgs) -> Result<()> {
             )?;
             if cli.json {
                 print_json(&serde_json::to_value(&response)?)?;
+            } else if cli.csv {
+                print!("{}", access::trip_csv(&response, !cli.no_header)?);
             } else {
                 print!("{}", access::trip_table(&response));
             }
         }
         AccessCommand::Status => {
-            if cli.csv {
-                bail!("--csv is not supported for `access status`");
-            }
             let client = access::AccessClient::new(Duration::from_secs(cli.cache_ttl))?;
             let status = client.ael_status().await?;
             if cli.json {
                 print_json(&serde_json::to_value(&status)?)?;
+            } else if cli.csv {
+                print!("{}", access::status_csv(&status, !cli.no_header)?);
             } else {
                 print!("{}", access::status_table(&status));
             }
         }
+    }
+    Ok(())
+}
+
+async fn run_runway(cli: &Cli) -> Result<()> {
+    let status = runway::fetch().await?;
+    if cli.json {
+        print_json(&serde_json::to_value(&status)?)?;
+    } else if cli.csv {
+        print!("{}", runway::runway_csv(&status, !cli.no_header)?);
+    } else {
+        print!("{}", runway::runway_table(&status));
     }
     Ok(())
 }

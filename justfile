@@ -23,6 +23,10 @@ clippy:
 test:
     cargo test --all --locked
 
+# Compare the embedded access data with the official sources (needs network).
+access-data-check:
+    python3 scripts/refresh_access_data.py --check
+
 # Audit dependencies for known vulnerabilities.
 audit:
     @if command -v cargo-audit >/dev/null 2>&1; then cargo audit; else echo "cargo-audit is not installed; skipping (cargo install cargo-audit)"; fi
@@ -84,5 +88,5 @@ release VERSION:
 clean:
     cargo clean
 
-# Run the checks and a release build.
-ci: check build-release
+# Run the checks, the access data drift check and a release build.
+ci: check access-data-check build-release
