@@ -292,6 +292,9 @@ struct WatchArgs {
     /// Skip the Airport Express line-status checks
     #[arg(long)]
     no_ael: bool,
+    /// Skip the runway-in-use checks
+    #[arg(long)]
+    no_runway: bool,
 }
 
 #[derive(Args)]
@@ -998,6 +1001,7 @@ async fn run_watch(cli: &Cli, args: &WatchArgs) -> Result<()> {
         }
     };
     let mut last_ael: Option<bool> = None;
+    let mut last_runway: Option<String> = None;
 
     loop {
         let (flights, last_updated) = fetch_flights(
@@ -1032,6 +1036,23 @@ async fn run_watch(cli: &Cli, args: &WatchArgs) -> Result<()> {
             None
         };
         last_ael = ael_delayed.or(last_ael);
+        let runway_status = if args.no_runway {
+            None
+        } else {
+            runway::fetch().await.ok()
+        };
+        let current_runway = runway_status.as_ref().and_then(runway::runway_summary);
+        let runway_event = if baseline_taken {
+            match (&last_runway, &current_runway) {
+                (Some(previous), Some(current)) if previous != current => {
+                    Some(format!("Runway in use changed: {previous} -> {current}"))
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
+        last_runway = current_runway.or(last_runway);
 
         if !baseline_taken {
             let alerts = build_alerts(&current, minimum, include_cancelled);
@@ -1045,6 +1066,7 @@ async fn run_watch(cli: &Cli, args: &WatchArgs) -> Result<()> {
                     "watchlist": watchlist_used,
                     "weather": weather_report,
                     "airportExpress": ael_status,
+                    "runway": runway_status,
                     "alerts": alerts,
                 }))?;
             } else {
@@ -1070,6 +1092,9 @@ async fn run_watch(cli: &Cli, args: &WatchArgs) -> Result<()> {
                 if let Some(status) = &ael_status {
                     print!("\n{}", access::status_table(status));
                 }
+                if let Some(status) = &runway_status {
+                    print!("\n{}", runway::runway_table(status));
+                }
             }
             baseline_taken = true;
             if !changes.is_empty() {
@@ -1083,6 +1108,7 @@ async fn run_watch(cli: &Cli, args: &WatchArgs) -> Result<()> {
                         "timestamp": now,
                         "watchlist": watchlist_used,
                         "airportExpress": ael_status,
+                        "runway": runway_status,
                         "changes": changes,
                     }))?
                 );
@@ -1113,6 +1139,7 @@ async fn run_watch(cli: &Cli, args: &WatchArgs) -> Result<()> {
                         "timestamp": now,
                         "date": date.to_string(),
                         "watchlist": watchlist_used,
+                        "runway": runway_status,
                         "changes": changes,
                     });
                     match notify::webhook(url, &payload).await {
@@ -1152,6 +1179,39 @@ async fn run_watch(cli: &Cli, args: &WatchArgs) -> Result<()> {
                     "kind": "airport_express",
                     "timestamp": now,
                     "airportExpress": ael_status,
+                });
+                if let Err(error) = notify::webhook(url, &payload).await {
+                    eprintln!("warning: {error}");
+                }
+            }
+        }
+
+        if let Some(event) = runway_event {
+            if cli.json {
+                println!(
+                    "{}",
+                    serde_json::to_string(&json!({
+                        "timestamp": now,
+                        "kind": "runway",
+                        "runway": runway_status,
+                    }))?
+                );
+            } else {
+                println!("{now}  {event}");
+                if let Some(status) = &runway_status {
+                    print!("{}", runway::runway_table(status));
+                }
+            }
+            if desktop && let Err(error) = notify::desktop("HKG: Runway", &event).await {
+                eprintln!("warning: {error}");
+            }
+            if let Some(url) = &webhook {
+                let payload = json!({
+                    "source": "hkia",
+                    "version": 1,
+                    "kind": "runway",
+                    "timestamp": now,
+                    "runway": runway_status,
                 });
                 if let Err(error) = notify::webhook(url, &payload).await {
                     eprintln!("warning: {error}");

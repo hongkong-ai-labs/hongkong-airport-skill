@@ -346,6 +346,16 @@ fn mcp_routes_access_modes_and_resources() {
     assert!(names.contains(&"get_airport_access"), "tools: {names:?}");
     assert!(names.contains(&"get_alerts"), "tools: {names:?}");
     assert!(names.contains(&"get_runway_status"), "tools: {names:?}");
+    let alerts_tool = tools["result"]["tools"]
+        .as_array()
+        .expect("tools list")
+        .iter()
+        .find(|tool| tool["name"] == "get_alerts")
+        .expect("get_alerts tool");
+    assert!(
+        alerts_tool["inputSchema"]["properties"]["include_runway"].is_object(),
+        "get_alerts schema: {alerts_tool}"
+    );
 
     let resources = mcp.call(11, "resources/list", serde_json::json!({}));
     let uris = resources["result"]["resources"]

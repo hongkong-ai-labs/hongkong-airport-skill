@@ -19,6 +19,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   departures, with the ATIS letter and issue time, the reported airport wind,
   and computed head/tailwind and crosswind components. Available as a table,
   JSON, CSV, MCP tool `get_runway_status` and `hkia://runway/status` resource.
+  When the ATIS is unavailable it falls back to the HKO 10-minute Chek Lap Kok
+  wind, marks `atis_available: false` and reports only which runway the wind
+  favours under the AIP rule.
+- `hkia watch` reports runway-in-use changes alongside flight, AEL and weather
+  changes, with desktop/webhook delivery and `--no-runway` to opt out.
+- MCP `get_alerts` includes the runway in use (and gains `include_runway`).
 - Official MTR Airport Express fares, including child and 30-day round-trip
   fares, replacing hand-maintained fare tables.
 - AEL delay status in `hkia alerts` and `hkia watch` (including change

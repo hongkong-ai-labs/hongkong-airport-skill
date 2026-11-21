@@ -28,7 +28,8 @@ the HKIA app and website — and turns it into:
 - the runway in use with the airport wind and computed wind components
 - an installable agent skill (`SKILL.md`)
 
-No API key, no scraping, no browser automation.
+No data API key, no scraping, no browser automation. The HTTP MCP transport can
+optionally require a static API key.
 
 This is an independent, unofficial project. It is not affiliated with Airport
 Authority Hong Kong or HKIA, it sends no telemetry, and the underlying feed
@@ -157,8 +158,25 @@ container run --rm -p 8787:8787 -e HKIA_MCP_API_KEY="$SECRET" \
 ```
 
 Or `docker compose up --build`. The compose file exposes port 8787 and mounts
-named volumes for the SQLite store and watchlist. If you publish the image,
-set `HKIA_AUTH_TOKEN` before exposing it beyond localhost.
+named volumes for the SQLite store and watchlist. If you expose the HTTP MCP
+transport beyond localhost, set `HKIA_MCP_API_KEY` (or use `--api-key`).
+
+### Cloudflare Worker + Container
+
+`wrangler.jsonc` and `cloudflare/` deploy the HTTP MCP server as a Worker front
+door plus a Cloudflare Container. Wrangler builds the `linux/amd64` image from
+the root `Dockerfile`; a Docker-compatible engine is required. Set the optional
+key and deploy from the repository root:
+
+```bash
+npx wrangler secret put HKIA_MCP_API_KEY
+npx wrangler deploy
+```
+
+Cloudflare's remote MCP transport is Streamable HTTP at `/mcp`; `/health` stays
+public. A pure WASM Worker is deliberately not included: the server needs
+TCP/TLS, a Tokio runtime and bundled SQLite. See
+[`cloudflare/README.md`](cloudflare/README.md).
 
 ## Run modes
 
@@ -245,7 +263,7 @@ the complete flag set, including per-command filters such as `--flight`,
 | `flight <number>` | One flight across both boards and codeshares, with guidance |
 | `delays` | Flights delayed beyond a threshold |
 | `alerts` | Cancellations and delays, optional watchlist and weather |
-| `watch` | Poll and print status/gate/belt changes |
+| `watch` | Poll and print status/gate/belt changes, plus AEL status and runway changes |
 | `stats` | Single-day stats, or historical range analytics |
 | `history <number>` | Locally observed status/gate timeline |
 | `access` | `ael`, `status`, `checkin`, `bus`, `trip` airport-access queries |
@@ -480,6 +498,18 @@ predicting from wind. Wind components are derived from the reported wind, not
 threshold measurements, and the ATIS page can be briefly unavailable while a
 bulletin updates.
 
+When the ATIS page cannot be read, `hkia runway` falls back to the Hong Kong
+Observatory's 10-minute wind at Chek Lap Kok and says plainly that the runway is
+not confirmed. In that mode the JSON has `atis_available: false`, a `wind`
+object with the compass direction and knots, and `wind_favours`, which applies
+the AIP rule (runway 07 when the tailwind is 5 knots or less). The wind favour
+is an indication, not the runway in use, and the command never invents one. If
+both the ATIS and the HKO feed fail, it returns an error instead.
+
+`hkia watch` polls the runway with the rest of the board and prints, notifies
+and webhooks when the arrival or departure runway changes (`--no-runway` skips
+those checks, `--no-ael` skips the AEL status).
+
 ## MCP
 
 ### stdio
@@ -606,6 +636,8 @@ to 240 per minute by default across the process (`--rate-limit 0` disables,
 
 Keep the token in your client's secret store or an environment variable where
 the client supports interpolation; do not commit it to a shared config file.
+`/health` remains public so container and Worker readiness probes do not need
+the key.
 
 ### Tools
 
@@ -614,7 +646,7 @@ the client supports interpolation; do not commit it to a shared config file.
 | `list_flights` | Board listing with airport, airline, terminal, state, delay, sort and limit filters |
 | `search_flight` | One flight number across departures, arrivals, and codeshares |
 | `get_delays` | Flights delayed beyond a threshold |
-| `get_alerts` | Cancellations and delays as severity-ranked alerts, optional weather |
+| `get_alerts` | Cancellations and delays as severity-ranked alerts, with weather, AEL status and runway in use |
 | `get_stats` | Single-day on-time performance and hourly breakdown |
 | `get_watchlist_alerts` | Disruptions filtered to the local watchlist, optional weather |
 | `get_flight_history` | Locally observed status/gate/belt timeline for a flight |
@@ -629,8 +661,8 @@ Watchlist and history tools use the local SQLite store and config, so the same
 `direction`, `cargo`, and `lang`; `get_airport_access` takes `mode`, `station`,
 `direction`, `airline`, `route`, `time`, `date`, `terminal`, `buffer_minutes` and
 `no_live`. Its modes are `airport-express`, `airport-express-status`,
-`in-town-checkin`, `airport-bus` and `trip`. See each tool's schema for exact
-names.
+`in-town-checkin`, `airport-bus` and `trip`. `get_alerts` takes `include_ael` and
+`include_runway` (both default true). See each tool's schema for exact names.
 
 ### Resources
 
@@ -658,8 +690,9 @@ serialized resource changes. For reliable push-style integrations, prefer
   existing release tag.
 - **Unsupported platform:** prebuilt binaries cover macOS x86_64/arm64 and Linux
   x86_64/aarch64. Use `cargo install --path . --locked` elsewhere.
-- **MCP returns 401:** the client must send `Authorization: Bearer <token>` when
-  `--auth-token` or `HKIA_AUTH_TOKEN` is set.
+- **MCP returns 401:** the client must send `Authorization: Bearer <key>` (or
+  `X-API-Key`) when `--api-key`, `HKIA_MCP_API_KEY` or an alias is set. `/health`
+  stays public.
 - **MCP returns 429:** the process-wide rate limit was reached; raise
   `--rate-limit` or wait for `Retry-After`.
 - **Webhook delivery fails:** the request times out after 15 seconds, non-2xx

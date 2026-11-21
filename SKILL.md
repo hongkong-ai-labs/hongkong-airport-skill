@@ -7,7 +7,8 @@ license: MIT
 # HKIA flights
 
 `hkia` is a Rust CLI and MCP server for the public Hong Kong International Airport
-flight-information feed. It needs no API key and no account. It is an
+flight-information feed. It needs no data API key and no account; the HTTP MCP
+transport can optionally require a static API key. It is an
 independent, unofficial project and is not affiliated with the airport.
 
 Use it when the user asks about:
@@ -259,8 +260,13 @@ crosswind for the arrival runway. The source is the official CAD ATIS page on
 - Runway 07 is preferred when the tailwind is 5 knots or less (AIP VHHH
   AD 2.22), but ATC can use 25 when required. Do not predict the runway from
   wind when the ATIS is available.
-- The ATIS page can be briefly unavailable while a bulletin updates; say so
-  instead of inventing a runway.
+- If the ATIS page is unavailable, the command falls back to the HKO 10-minute
+  wind at Chek Lap Kok: `atis_available` is false, `wind` holds the observation
+  and `wind_favours` applies the AIP rule. Say the runway is not confirmed and
+  do not present the favoured runway as the runway in use. If both feeds fail,
+  report the error.
+- `hkia watch` prints and notifies when the runway changes; `--no-runway`
+  disables that check.
 
 ## Watchlist and notifications
 
@@ -286,7 +292,9 @@ Manage it with `hkia watchlist add --flight CX251`,
 `hkia watchlist show`, and `hkia watchlist remove --flight CX251`.
 
 Use `--watchlist` with `alerts` or `watch` to restrict output to the watchlist.
-`--notify` sends desktop notifications; `--webhook URL` POSTs JSON. Alert
+`--notify` sends desktop notifications; `--webhook URL` POSTs JSON. `watch` also
+reports AEL delay changes (`--no-ael` disables) and runway-in-use changes
+(`--no-runway` disables), each with its own notification kind. Alert
 notifications are deduplicated by fingerprint in SQLite, so a restart does not
 resend the same alert. Empty selectors match everything.
 
@@ -351,7 +359,8 @@ MCP tools:
   sort, and limit filters
 - `search_flight` — one flight number across both boards
 - `get_delays` — flights delayed beyond a threshold
-- `get_alerts` — cancellations and delays as severity-ranked alerts, optional weather
+- `get_alerts` — cancellations and delays as severity-ranked alerts, with
+  optional weather, AEL status and runway in use (`include_ael`, `include_runway`)
 - `get_stats` — single-day on-time performance and hourly breakdown
 - `get_watchlist_alerts` — disruptions filtered to the local watchlist
 - `get_flight_history` — locally observed status/gate/belt timeline

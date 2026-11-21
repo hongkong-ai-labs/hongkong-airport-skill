@@ -17,8 +17,11 @@ use crate::api::{hk_now, hk_offset};
 pub const ATIS_URL: &str = "https://atis.cad.gov.hk/ATIS/ATISweb/atis.php";
 pub const ATIS_SOURCE: &str = "https://www.hkatc.gov.hk/";
 pub const AIP_SOURCE: &str = "https://www.ais.gov.hk/eaip/";
+pub const HKO_WIND_URL: &str =
+    "https://data.weather.gov.hk/weatherAPI/hko_data/regional-weather/latest_10min_wind.csv";
 
-const NOTE: &str = "Runway in use comes from the official CAD ATIS; arrivals and departures can use different runways. Wind components are computed from the reported wind for the arrival runway, not measured at the threshold.";
+const HKO_STATION: &str = "Chek Lap Kok";
+const NOTE: &str = "Runway in use comes from the official CAD ATIS; arrivals and departures can use different runways. Wind components are computed from the reported wind for the arrival runway, not measured at the threshold. When the ATIS page is unavailable, only the HKO 10-minute wind is reported and no runway is claimed.";
 
 #[derive(Debug, Clone, Serialize)]
 pub struct WindReport {
@@ -42,11 +45,28 @@ pub struct AtisReport {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct WindObservation {
+    pub station: String,
+    pub direction_degrees: Option<u16>,
+    pub direction_compass: Option<String>,
+    pub speed_knots: u16,
+    pub gust_knots: Option<u16>,
+    pub observed_at: String,
+    pub source: Source,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct RunwayStatus {
     pub mode: &'static str,
     pub fetched_at: String,
+    pub atis_available: bool,
     pub arrival: Option<AtisReport>,
     pub departure: Option<AtisReport>,
+    /// Only set when the ATIS is unavailable and the HKO wind is used instead.
+    pub wind: Option<WindObservation>,
+    /// Runway the wind favours under the AIP preferential-use rule.
+    pub wind_favours: Option<&'static str>,
+    pub error: Option<String>,
     pub note: &'static str,
     pub source: Source,
 }
@@ -55,7 +75,14 @@ pub async fn fetch() -> Result<RunwayStatus> {
     let http = reqwest::Client::builder()
         .timeout(Duration::from_secs(20))
         .build()
-        .context("building the ATIS HTTP client")?;
+        .context("building the airport weather HTTP client")?;
+    match fetch_atis(&http, Utc::now()).await {
+        Ok(status) => Ok(status),
+        Err(atis_error) => wind_only(&http, atis_error).await,
+    }
+}
+
+async fn fetch_atis(http: &reqwest::Client, now: DateTime<Utc>) -> Result<RunwayStatus> {
     let response = http
         .get(ATIS_URL)
         .send()
@@ -66,7 +93,117 @@ pub async fn fetch() -> Result<RunwayStatus> {
     if !status.is_success() {
         return Err(anyhow!("CAD ATIS returned HTTP {}", status.as_u16()));
     }
-    parse_atis(&body, Utc::now())
+    parse_atis(&body, now)
+}
+
+async fn wind_only(http: &reqwest::Client, atis_error: anyhow::Error) -> Result<RunwayStatus> {
+    let wind = match fetch_hko_wind(http).await {
+        Ok(wind) => wind,
+        Err(wind_error) => {
+            return Err(anyhow!(
+                "CAD ATIS unavailable ({atis_error:#}); HKO wind unavailable ({wind_error:#})"
+            ));
+        }
+    };
+    let wind_favours = wind
+        .direction_degrees
+        .and_then(|direction| favoured_runway(direction, wind.speed_knots));
+    Ok(RunwayStatus {
+        mode: "runway_status",
+        fetched_at: hk_now().to_rfc3339_opts(SecondsFormat::Secs, false),
+        atis_available: false,
+        arrival: None,
+        departure: None,
+        wind: Some(wind),
+        wind_favours,
+        error: Some(format!("{atis_error:#}")),
+        note: NOTE,
+        source: Source {
+            name: "Civil Aviation Department ATIS".to_string(),
+            url: ATIS_SOURCE.to_string(),
+        },
+    })
+}
+
+async fn fetch_hko_wind(http: &reqwest::Client) -> Result<WindObservation> {
+    let response = http
+        .get(HKO_WIND_URL)
+        .send()
+        .await
+        .context("fetching the HKO 10-minute wind file")?;
+    let status = response.status();
+    let body = response
+        .text()
+        .await
+        .context("reading the HKO 10-minute wind file")?;
+    if !status.is_success() {
+        return Err(anyhow!("HKO wind file returned HTTP {}", status.as_u16()));
+    }
+    parse_hko_wind(&body).ok_or_else(|| anyhow!("no {HKO_STATION} row in the HKO wind file"))
+}
+
+fn parse_hko_wind(text: &str) -> Option<WindObservation> {
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .from_reader(text.as_bytes());
+    for record in reader.records().flatten() {
+        if record.get(1).map(str::trim) != Some(HKO_STATION) {
+            continue;
+        }
+        let observed_at = parse_hko_datetime(record.get(0).map(str::trim).unwrap_or_default())?;
+        let compass = record
+            .get(2)
+            .map(str::trim)
+            .filter(|value| !value.is_empty() && !value.eq_ignore_ascii_case("N/A"));
+        let speed_kmh = record
+            .get(3)
+            .and_then(|value| value.trim().parse::<f64>().ok())
+            .unwrap_or(0.0);
+        let gust_kmh = record
+            .get(4)
+            .and_then(|value| value.trim().parse::<f64>().ok());
+        return Some(WindObservation {
+            station: HKO_STATION.to_string(),
+            direction_degrees: compass.and_then(compass_degrees),
+            direction_compass: compass.map(str::to_string),
+            speed_knots: kmh_to_knots(speed_kmh),
+            gust_knots: gust_kmh.map(kmh_to_knots),
+            observed_at,
+            source: Source {
+                name: "Hong Kong Observatory 10-minute wind (Chek Lap Kok)".to_string(),
+                url: HKO_WIND_URL.to_string(),
+            },
+        });
+    }
+    None
+}
+
+fn parse_hko_datetime(value: &str) -> Option<String> {
+    let naive = chrono::NaiveDateTime::parse_from_str(value, "%Y%m%d%H%M").ok()?;
+    Some(
+        hk_offset()
+            .from_local_datetime(&naive)
+            .single()?
+            .to_rfc3339_opts(SecondsFormat::Secs, false),
+    )
+}
+
+fn kmh_to_knots(speed: f64) -> u16 {
+    (speed * 0.539_956_8).round() as u16
+}
+
+fn compass_degrees(value: &str) -> Option<u16> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "n" | "north" => Some(0),
+        "ne" | "northeast" => Some(45),
+        "e" | "east" => Some(90),
+        "se" | "southeast" => Some(135),
+        "s" | "south" => Some(180),
+        "sw" | "southwest" => Some(225),
+        "w" | "west" => Some(270),
+        "nw" | "northwest" => Some(315),
+        _ => None,
+    }
 }
 
 fn parse_atis(html: &str, now: DateTime<Utc>) -> Result<RunwayStatus> {
@@ -113,8 +250,12 @@ fn parse_atis(html: &str, now: DateTime<Utc>) -> Result<RunwayStatus> {
     Ok(RunwayStatus {
         mode: "runway_status",
         fetched_at: hk_now().to_rfc3339_opts(SecondsFormat::Secs, false),
+        atis_available: true,
         arrival,
         departure,
+        wind: None,
+        wind_favours: None,
+        error: None,
         note: NOTE,
         source: Source {
             name: "Civil Aviation Department ATIS".to_string(),
@@ -285,6 +426,37 @@ fn components(
     Some((headwind, crosswind, side))
 }
 
+fn favoured_runway(direction: u16, speed: u16) -> Option<&'static str> {
+    // AIP VHHH AD 2.22: runway 07 is in use whenever the tailwind is 5 kt or less.
+    let (headwind, _, _) = components(direction, speed, "07")?;
+    Some(if headwind >= -5 { "07" } else { "25" })
+}
+
+/// "arrivals 07C, departures 07R" when the ATIS names a runway.
+pub fn runway_summary(status: &RunwayStatus) -> Option<String> {
+    let arrival = status.arrival.as_ref()?.runway.clone()?;
+    let departure = status
+        .departure
+        .as_ref()
+        .and_then(|report| report.runway.clone())
+        .unwrap_or_else(|| arrival.clone());
+    Some(format!("arrivals {arrival}, departures {departure}"))
+}
+
+fn observation_label(wind: &WindObservation) -> String {
+    if wind.speed_knots == 0 {
+        return "calm".to_string();
+    }
+    match (wind.direction_degrees, wind.direction_compass.as_deref()) {
+        (Some(direction), Some(compass)) => {
+            format!("{compass} ({direction:03}°)/{:02} kt", wind.speed_knots)
+        }
+        (Some(direction), None) => format!("{direction:03}°/{:02} kt", wind.speed_knots),
+        (None, Some(compass)) => format!("{compass}/{:02} kt", wind.speed_knots),
+        (None, None) => format!("variable/{:02} kt", wind.speed_knots),
+    }
+}
+
 fn wind_label(wind: &WindReport) -> String {
     match wind.direction_degrees {
         Some(direction) => format!("{direction:03}°/{:02} kt", wind.speed_knots),
@@ -318,7 +490,14 @@ fn wind_line(report: &AtisReport) -> Option<String> {
     Some(line)
 }
 
+fn time_part(timestamp: &str) -> &str {
+    timestamp.get(11..16).unwrap_or(timestamp)
+}
+
 pub fn runway_table(status: &RunwayStatus) -> String {
+    if !status.atis_available {
+        return wind_only_table(status);
+    }
     let label = |report: &Option<AtisReport>| {
         report
             .as_ref()
@@ -329,7 +508,7 @@ pub fn runway_table(status: &RunwayStatus) -> String {
         "HKG runway in use  |  arrivals {}  |  departures {}  |  fetched {} HKT\n",
         label(&status.arrival),
         label(&status.departure),
-        status.fetched_at.get(11..16).unwrap_or(&status.fetched_at)
+        time_part(&status.fetched_at)
     );
     for report in [&status.arrival, &status.departure].into_iter().flatten() {
         let title = if report.kind == "arrival" {
@@ -348,13 +527,46 @@ pub fn runway_table(status: &RunwayStatus) -> String {
         output.push_str(&format!(
             "ATIS {} issued {} HKT\n",
             report.letter,
-            report.issued_at.get(11..16).unwrap_or(&report.issued_at)
+            time_part(&report.issued_at)
         ));
     }
     output.push_str(&format!("\n{}\n", status.note));
     output.push_str(&format!(
         "Source: {} ({}); AIP: {}.\n",
         status.source.name, status.source.url, AIP_SOURCE
+    ));
+    output
+}
+
+fn wind_only_table(status: &RunwayStatus) -> String {
+    let mut output = format!(
+        "HKG runway  |  ATIS unavailable — runway not confirmed  |  fetched {} HKT\n",
+        time_part(&status.fetched_at)
+    );
+    if let Some(wind) = &status.wind {
+        let gust = wind
+            .gust_knots
+            .map(|gust| format!(" (gust {gust} kt)"))
+            .unwrap_or_default();
+        output.push_str(&format!(
+            "HKO wind at {}: {}{gust}, observed {} HKT\n",
+            wind.station,
+            observation_label(wind),
+            time_part(&wind.observed_at)
+        ));
+        match status.wind_favours {
+            Some(runway) => output.push_str(&format!(
+                "Wind favours RWY {runway} under the AIP rule (runway 07 when the tailwind is 5 kt or less) — an indication only, not the runway in use.\n"
+            )),
+            None => output.push_str("Wind is calm or variable; no runway is indicated.\n"),
+        }
+    }
+    if let Some(error) = &status.error {
+        output.push_str(&format!("ATIS error: {error}\n"));
+    }
+    output.push_str(&format!("\n{}\n", status.note));
+    output.push_str(&format!(
+        "Source: HKO 10-minute wind ({HKO_WIND_URL}); AIP: {AIP_SOURCE}.\n"
     ));
     output
 }
@@ -372,7 +584,28 @@ pub fn runway_csv(status: &RunwayStatus, header: bool) -> Result<String> {
             "crosswind_from",
             "atis_letter",
             "issued_at",
+            "wind_favours",
         ])?;
+    }
+    if !status.atis_available {
+        if let Some(wind) = &status.wind {
+            writer.write_record([
+                "wind".to_string(),
+                String::new(),
+                String::new(),
+                observation_label(wind),
+                String::new(),
+                String::new(),
+                String::new(),
+                String::new(),
+                wind.observed_at.clone(),
+                status.wind_favours.unwrap_or_default().to_string(),
+            ])?;
+        }
+        let bytes = writer
+            .into_inner()
+            .map_err(|error| anyhow!("writing CSV: {error}"))?;
+        return String::from_utf8(bytes).map_err(|error| anyhow!("CSV was not UTF-8: {error}"));
     }
     for report in [&status.arrival, &status.departure].into_iter().flatten() {
         writer.write_record([
@@ -400,6 +633,7 @@ pub fn runway_csv(status: &RunwayStatus, header: bool) -> Result<String> {
                 .to_string(),
             report.letter.clone(),
             report.issued_at.clone(),
+            String::new(),
         ])?;
     }
     let bytes = writer
@@ -528,6 +762,75 @@ mod tests {
 
         let (headwind, _, _) = components(70, 12, "07C").unwrap();
         assert_eq!(headwind, 12);
+    }
+
+    const HKO_FIXTURE: &str = "Date time,Automatic Weather Station,10-Minute Mean Wind Direction(Compass points),10-Minute Mean Speed(km/hour),10-Minute Maximum Gust(km/hour)\n202611220100,Central Pier,East,30,42\n202611220100,Chek Lap Kok,Northeast,12,16\n";
+
+    fn wind_only_status() -> RunwayStatus {
+        let wind = parse_hko_wind(HKO_FIXTURE).unwrap();
+        RunwayStatus {
+            mode: "runway_status",
+            fetched_at: "2026-11-22T01:10:00+08:00".to_string(),
+            atis_available: false,
+            arrival: None,
+            departure: None,
+            wind_favours: wind
+                .direction_degrees
+                .and_then(|direction| favoured_runway(direction, wind.speed_knots)),
+            wind: Some(wind),
+            error: Some("CAD ATIS returned HTTP 503".to_string()),
+            note: NOTE,
+            source: Source {
+                name: "Civil Aviation Department ATIS".to_string(),
+                url: ATIS_SOURCE.to_string(),
+            },
+        }
+    }
+
+    #[test]
+    fn parses_the_hko_airport_wind() {
+        let wind = parse_hko_wind(HKO_FIXTURE).unwrap();
+        assert_eq!(wind.station, "Chek Lap Kok");
+        assert_eq!(wind.direction_compass.as_deref(), Some("Northeast"));
+        assert_eq!(wind.direction_degrees, Some(45));
+        assert_eq!(wind.speed_knots, 6);
+        assert_eq!(wind.gust_knots, Some(9));
+        assert_eq!(wind.observed_at, "2026-11-22T01:00:00+08:00");
+        assert!(parse_hko_wind("Date time,Station\n").is_none());
+    }
+
+    #[test]
+    fn wind_favour_follows_the_aip_rule() {
+        assert_eq!(favoured_runway(40, 7), Some("07"));
+        assert_eq!(favoured_runway(250, 3), Some("07"));
+        assert_eq!(favoured_runway(220, 20), Some("25"));
+        assert_eq!(favoured_runway(250, 10), Some("25"));
+    }
+
+    #[test]
+    fn wind_only_output_does_not_claim_a_runway() {
+        let status = wind_only_status();
+        let table = runway_table(&status);
+        assert!(table.contains("ATIS unavailable"));
+        assert!(table.contains("not confirmed"));
+        assert!(table.contains("favours RWY 07"));
+        assert!(table.contains("Northeast"));
+        assert!(table.contains("HTTP 503"));
+        assert_eq!(runway_summary(&status), None);
+
+        let csv = runway_csv(&status, true).unwrap();
+        assert!(csv.contains("wind,"));
+        assert!(csv.contains("07"), "csv: {csv}");
+        assert!(runway_csv(&status, false).unwrap().lines().count() == 1);
+    }
+
+    #[test]
+    fn runway_summary_matches_the_atis() {
+        let status = parse_atis(&fixture(), now()).unwrap();
+        assert_eq!(
+            runway_summary(&status).as_deref(),
+            Some("arrivals 07C, departures 07R")
+        );
     }
 
     #[test]

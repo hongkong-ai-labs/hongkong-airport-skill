@@ -497,6 +497,8 @@ struct AlertsArgs {
         description = "Include the live Airport Express delay flag from the MTR Next Train API. Default true"
     )]
     include_ael: Option<bool>,
+    #[schemars(description = "Include the runway in use from the CAD ATIS. Default true")]
+    include_runway: Option<bool>,
     #[schemars(description = "Maximum number of alerts to return; 0 returns all. Default 50")]
     limit: Option<usize>,
     #[schemars(description = "Read the cargo board instead of the passenger board")]
@@ -821,7 +823,7 @@ impl HkiaServer {
     }
 
     #[tool(
-        description = "Get real-time disruption alerts for HKG: cancellations and delays, with severity, route, latest times, gate and baggage belt. Use this for airport-wide disruption questions."
+        description = "Get real-time disruption alerts for HKG: cancellations and delays, with severity, route, latest times, gate and baggage belt, plus the live Airport Express delay flag and the runway in use. Use this for airport-wide disruption questions."
     )]
     async fn get_alerts(
         &self,
@@ -854,6 +856,11 @@ impl HkiaServer {
         } else {
             None
         };
+        let runway = if args.include_runway.unwrap_or(true) {
+            runway::fetch().await.ok()
+        } else {
+            None
+        };
         Ok(serde_json::to_string_pretty(&json!({
             "date": date.to_string(),
             "direction": direction.map(|direction| direction.as_str()).unwrap_or("both"),
@@ -866,6 +873,7 @@ impl HkiaServer {
             "alerts": alerts,
             "weather": weather,
             "airportExpress": airport_express,
+            "runway": runway,
         }))
         .unwrap_or_else(|_| "{}".to_string()))
     }
