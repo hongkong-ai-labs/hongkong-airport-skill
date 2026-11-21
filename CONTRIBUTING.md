@@ -53,3 +53,4 @@ cargo run -- --version
 
 Version bumps are tagged with `just tag <version>`; pushing the tag runs the
 release workflow, which builds the binaries for macOS and Linux.
+
