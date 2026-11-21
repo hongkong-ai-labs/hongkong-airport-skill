@@ -73,6 +73,10 @@ struct Cli {
     #[arg(long, global = true, default_value_t = 20)]
     cache_ttl: u64,
 
+    /// Days of flight and runway history to keep when the store is pruned
+    #[arg(long, global = true, default_value_t = 90)]
+    keep_days: u32,
+
     /// Override the history database path
     #[arg(long, global = true)]
     db: Option<PathBuf>,
@@ -538,6 +542,7 @@ async fn main() -> Result<()> {
                 cli.cache_ttl,
                 cli.db.clone(),
                 cli.config.clone(),
+                cli.keep_days as i64,
             )
             .await?;
         }
@@ -846,7 +851,7 @@ fn open_store(cli: &Cli) -> Result<Store> {
         Some(path) => Store::open(path),
         None => Store::open_default(),
     }?;
-    let _ = store.prune(90);
+    let _ = store.prune(cli.keep_days as i64);
     Ok(store)
 }
 
@@ -928,6 +933,11 @@ async fn run_alerts(cli: &Cli, args: &AlertArgs) -> Result<()> {
     } else {
         runway::fetch().await.ok()
     };
+    let runway_last = last_observed_switch(cli);
+    let runway_payload = match &runway_status {
+        Some(status) => Some(runway::status_json(status, runway_last.as_ref())?),
+        None => None,
+    };
     let webhook = args.webhook.clone().or(config.notify.webhook.clone());
     let desktop = args.notify || config.notify.desktop;
     let mut notified = 0usize;
@@ -969,7 +979,7 @@ async fn run_alerts(cli: &Cli, args: &AlertArgs) -> Result<()> {
                     "watchlist": watchlist_used,
                     "weather": weather_report,
                     "airportExpress": ael_status,
-                    "runway": runway_status,
+                    "runway": runway_payload,
                     "alerts": selected,
                 });
                 match notify::webhook(&url, &payload).await {
@@ -997,7 +1007,7 @@ async fn run_alerts(cli: &Cli, args: &AlertArgs) -> Result<()> {
             "watchlist": watchlist_used,
             "weather": weather_report,
             "airportExpress": ael_status,
-            "runway": runway_status,
+            "runway": runway_payload,
             "notified": notified,
             "totalAlerts": total,
             "count": alerts.len(),
@@ -1023,6 +1033,7 @@ async fn run_alerts(cli: &Cli, args: &AlertArgs) -> Result<()> {
         }
         if let Some(status) = &runway_status {
             print!("\n{}", runway::runway_table(status));
+            print!("{}", runway::last_change_line(runway_last.as_ref()));
         }
         if notified > 0 {
             print!("\nNotified {notified} new alert(s).\n");
@@ -1054,6 +1065,10 @@ async fn run_watch(cli: &Cli, args: &WatchArgs) -> Result<()> {
     let mut filter = args.common.filter()?;
     filter.limit = 0;
     let store = open_store(cli)?;
+    if !cli.json && !cli.csv {
+        let history = store.runway_history(0).unwrap_or_default();
+        print!("{}", runway::history_summary_line(&history));
+    }
     let webhook = args.webhook.clone().or(config.notify.webhook.clone());
     let desktop = args.notify || config.notify.desktop;
     let mut baseline_taken = false;

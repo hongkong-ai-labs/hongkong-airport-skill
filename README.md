@@ -281,6 +281,7 @@ the complete flag set, including per-command filters such as `--flight`,
 | `--color auto\|always\|never` | Table colour policy (default `auto`) |
 | `--sort time\|delay\|flight\|state` | Board sort order (`departures`, `arrivals`, `flights`, `watch`) |
 | `--cache-ttl 20` | API cache seconds (HKIA and MTR); `0` disables |
+| `--keep-days 90` | Days of flight and runway history kept when the store is pruned |
 | `--cargo` | Read the cargo board instead of passenger flights |
 | `--lang en\|zh_HK\|zh_CN` | Raw feed language (default `en`); localized status text is parsed |
 | `--db PATH` | Override the SQLite history database |
@@ -518,7 +519,9 @@ part of the official ATIS.
 and webhooks when the arrival or departure runway changes (`--no-runway` skips
 those checks, `--no-ael` skips the AEL status). `hkia alerts` includes the
 current runway and AEL status too, with the same `--no-runway` / `--no-ael`
-opt-outs.
+opt-outs. `watch` opens with a one-line summary of the recorded runway history,
+and `alerts` prints the last observed switch beneath the live runway (JSON
+`last_observed`).
 
 Every observed switch is also written to the local SQLite store, so
 `hkia runway --history` shows what this machine actually saw, oldest first:
@@ -532,7 +535,9 @@ hkia runway --history --daily
 
 `--daily` groups the rows by local date and shows how many switches were seen
 that day with the first and last arrival/departure runway (`--limit` then caps
-the number of days).
+the number of days). History is pruned to the last `--keep-days` days (default
+90) whenever a command opens the store; raise it to keep more, or set `0` to
+keep none.
 
 ```
 Observed runway switches by day  |  1 day(s)  |  local store
@@ -693,7 +698,7 @@ the key.
 | `get_airport_access` | Live AEL trains and status, trip planning, dated in-town check-in hours, or A-route bus data with live ETAs |
 
 Watchlist and history tools use the local SQLite store and config, so the same
-`--db` and `--config` global flags apply. Most flight tools accept `date`,
+`--db`, `--config` and `--keep-days` global flags apply. Most flight tools accept `date`,
 `direction`, `cargo`, and `lang`; `get_airport_access` takes `mode`, `station`,
 `direction`, `airline`, `route`, `time`, `date`, `terminal`, `buffer_minutes` and
 `no_live`. Its modes are `airport-express`, `airport-express-status`,

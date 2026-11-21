@@ -8,6 +8,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- History retention is configurable with the global `--keep-days` flag
+  (default 90) for the CLI and MCP server. `hkia watch` prints a one-line
+  runway history summary at startup, and `hkia alerts` now shows the last
+  observed switch with the live runway in text and JSON.
 - `hkia runway` and the MCP tool `get_runway_status` (and its
   `hkia://runway/status` resource) now also report the most recently observed
   switch (`last_observed` in JSON). The MCP tool `get_runway_history` returns
