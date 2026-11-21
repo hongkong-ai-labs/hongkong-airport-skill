@@ -69,8 +69,8 @@ pub struct McpArgs {
     /// Streamable HTTP endpoint path.
     #[arg(long, default_value = "/mcp")]
     pub path: String,
-    /// Require `Authorization: Bearer <token>` on HTTP/SSE routes.
-    #[arg(long)]
+    /// Require this API key on HTTP/SSE routes (alias: --api-key).
+    #[arg(long, alias = "api-key")]
     pub auth_token: Option<String>,
     /// Maximum HTTP/SSE requests per minute; 0 disables. Default 240.
     #[arg(long, default_value_t = 240)]
@@ -79,7 +79,7 @@ pub struct McpArgs {
 
 #[derive(Clone)]
 struct AuthConfig {
-    token: Option<String>,
+    key: Option<String>,
 }
 
 #[derive(Clone)]
@@ -89,17 +89,44 @@ struct RateConfig {
 }
 
 async fn require_auth(State(config): State<AuthConfig>, request: Request, next: Next) -> Response {
-    if let Some(token) = &config.token {
-        let expected = format!("Bearer {token}");
-        let actual = request
-            .headers()
-            .get(header::AUTHORIZATION)
-            .and_then(|value| value.to_str().ok());
-        if actual != Some(expected.as_str()) {
-            return (StatusCode::UNAUTHORIZED, "unauthorized").into_response();
-        }
+    let Some(expected) = config.key.as_deref() else {
+        return next.run(request).await;
+    };
+    if request.method() == axum::http::Method::OPTIONS {
+        return next.run(request).await;
     }
-    next.run(request).await
+    let authorized = request
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .is_some_and(|value| constant_time_eq(value.as_bytes(), expected.as_bytes()))
+        || request
+            .headers()
+            .get("x-api-key")
+            .and_then(|value| value.to_str().ok())
+            .is_some_and(|value| constant_time_eq(value.as_bytes(), expected.as_bytes()));
+    if authorized {
+        next.run(request).await
+    } else {
+        (
+            StatusCode::UNAUTHORIZED,
+            [(header::WWW_AUTHENTICATE, "Bearer")],
+            "unauthorized",
+        )
+            .into_response()
+    }
+}
+
+fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut difference = 0u8;
+    for (left, right) in left.iter().zip(right) {
+        difference |= left ^ right;
+    }
+    difference == 0
 }
 
 async fn rate_limit(State(config): State<RateConfig>, request: Request, next: Next) -> Response {
@@ -160,14 +187,16 @@ async fn serve_http(
         bail!("--path must start with '/'");
     }
     let auth = AuthConfig {
-        token: args
+        key: args
             .auth_token
             .clone()
+            .or_else(|| std::env::var("HKIA_MCP_API_KEY").ok())
+            .or_else(|| std::env::var("HKIA_API_KEY").ok())
             .or_else(|| std::env::var("HKIA_AUTH_TOKEN").ok())
             .filter(|value| !value.trim().is_empty()),
     };
-    if auth.token.is_some() {
-        eprintln!("hkia MCP: bearer authentication enabled");
+    if auth.key.is_some() {
+        eprintln!("hkia MCP: API-key authentication enabled");
     }
     let rate = RateConfig {
         limit: args.rate_limit,
@@ -255,9 +284,11 @@ async fn serve_sse(
         sessions: Arc::new(Mutex::new(HashMap::new())),
     };
     let auth = AuthConfig {
-        token: args
+        key: args
             .auth_token
             .clone()
+            .or_else(|| std::env::var("HKIA_MCP_API_KEY").ok())
+            .or_else(|| std::env::var("HKIA_API_KEY").ok())
             .or_else(|| std::env::var("HKIA_AUTH_TOKEN").ok())
             .filter(|value| !value.trim().is_empty()),
     };
@@ -1392,5 +1423,18 @@ impl ServerHandler for HkiaServer {
             handle.abort();
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::constant_time_eq;
+
+    #[test]
+    fn compares_api_keys_without_early_exit() {
+        assert!(constant_time_eq(b"secret", b"secret"));
+        assert!(!constant_time_eq(b"secret", b"secreT"));
+        assert!(!constant_time_eq(b"secret", b"secret-longer"));
+        assert!(!constant_time_eq(b"", b"secret"));
     }
 }
