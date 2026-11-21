@@ -68,6 +68,7 @@ Official skills CLI (Node.js 22.20+):
 
 ```bash
 npx skills add hongkong-ai-labs/hongkong-airport-skill
+npx skills update        # refresh the installed skill later
 ```
 
 Rust-only alternative ([community `skills-cli`](https://crates.io/crates/skills-cli),
@@ -123,6 +124,8 @@ source build if a release asset is unavailable.
 git clone https://github.com/hongkong-ai-labs/hongkong-airport-skill
 cd hongkong-airport-skill
 cargo install --path . --locked
+# or directly from GitHub:
+cargo install --git https://github.com/hongkong-ai-labs/hongkong-airport-skill --locked
 # or: cargo build --release --locked   # target/release/hkia
 ```
 
@@ -211,6 +214,10 @@ hkia mcp --transport http --port 8787      # http://127.0.0.1:8787/mcp
 hkia mcp --transport sse --port 8787       # http://127.0.0.1:8787/sse
 ```
 
+`hkia update` detects whether the binary came from cargo, the release
+installer, a source checkout or Homebrew, and updates with that same
+method. `hkia update --check` only reports.
+
 ## CLI
 
 ```bash
@@ -246,6 +253,7 @@ hkia access checkin --airline CX        # dated in-town check-in reference
 hkia access bus --route A11             # dated windows plus live ETAs
 hkia access trip --airline CX --time 23:59 --date tomorrow --terminal T1
 hkia access bus --route A35 --direction to-airport --json
+hkia update --check
 ```
 
 Dates accept `YYYY-MM-DD`, `today`, `yesterday`, and `tomorrow`, resolved in
@@ -565,6 +573,19 @@ resource (last 20 switches).
 }
 ```
 
+Register it with any MCP client:
+
+```bash
+npx add-mcp "$(command -v hkia) mcp" --name hkia -a claude-code -a codex -a cursor -y
+claude mcp add hkia -- hkia mcp
+codex mcp add hkia -- hkia mcp
+```
+
+`add-mcp` detects the client configuration files in the current project; add
+`-g` for a global install. Substitute an absolute path if your client does not
+inherit the shell `PATH`.
+
+
 If `hkia` is not on the MCP client's `PATH`, replace `"command": "hkia"` with
 an absolute path. `scripts/ensure-binary.sh` prints the path to use. Restart the
 client after changing its MCP configuration.
@@ -583,22 +604,6 @@ Claude Desktop uses `claude_desktop_config.json` in its application-support
 directory. Paste the `mcpServers` block above into either file and restart the
 client.
 
-[`add-mcp`](https://add-mcp.com) is the closest equivalent to `npx skills add`
-for MCP servers: it detects supported clients and writes the correct config for
-each one.
-
-```bash
-npx add-mcp /absolute/path/to/hkia --args mcp --name hkia \
-  -a cursor -a claude-code -y
-
-# HTTP transport instead of stdio
-npx add-mcp http://127.0.0.1:8787/mcp --name hkia \
-  -a cursor -a claude-code -y
-```
-
-Use `$(command -v hkia)` in place of the path when `hkia` is already on
-`PATH`. `add-mcp` is a third-party Node.js tool; the JSON above works without
-it.
 
 ### Streamable HTTP
 
@@ -800,6 +805,12 @@ just check          # fmt-check, clippy, tests
 just skill-check    # validate SKILL.md and shell scripts the way CI does
 just build-release
 ```
+
+`rust-toolchain.toml` pins the stable toolchain with `rustfmt` and
+`clippy`, so `rustup` sets contributors up automatically. `just doc`
+builds the API documentation. See `CONTRIBUTING.md` for the full check
+list and the signed-commit requirement.
+
 
 Without `just`:
 
