@@ -29,6 +29,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   matching `watch` and the existing AEL status.
 - Runway switches observed by `watch` are stored in SQLite (90-day retention)
   and listed by `hkia runway --history [--limit N]` as a table, JSON or CSV.
+  `--daily` groups them per local date with the switch count and first/last
+  runway.
+- MCP resource `hkia://runway/history` exposes the last 20 observed runway
+  switches.
 - Official MTR Airport Express fares, including child and 30-day round-trip
   fares, replacing hand-maintained fare tables.
 - AEL delay status in `hkia alerts` and `hkia watch` (including change

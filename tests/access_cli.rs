@@ -369,6 +369,10 @@ fn mcp_routes_access_modes_and_resources() {
         "resources: {uris:?}"
     );
     assert!(
+        uris.contains(&"hkia://runway/history"),
+        "resources: {uris:?}"
+    );
+    assert!(
         uris.contains(&"hkia://access/ael/status"),
         "resources: {uris:?}"
     );
@@ -443,6 +447,19 @@ fn mcp_routes_access_modes_and_resources() {
         .expect("resource text");
     let resource_value: serde_json::Value = serde_json::from_str(text).expect("resource JSON");
     assert_eq!(resource_value["airline"]["iata"], "CX");
+
+    let history = mcp.call(
+        12,
+        "resources/read",
+        serde_json::json!({ "uri": "hkia://runway/history" }),
+    );
+    let history_text = history["result"]["contents"][0]["text"]
+        .as_str()
+        .expect("runway history text");
+    let history_value: serde_json::Value =
+        serde_json::from_str(history_text).expect("runway history JSON");
+    assert!(history_value["changes"].is_array());
+    assert_eq!(history_value["count"], 0);
 
     let missing = mcp.call(
         10,

@@ -40,6 +40,16 @@ pub struct RunwayChange {
     pub departure: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct RunwayDay {
+    pub date: String,
+    pub switches: usize,
+    pub first_arrival: String,
+    pub first_departure: String,
+    pub last_arrival: String,
+    pub last_departure: String,
+}
+
 pub struct Store {
     connection: Mutex<Connection>,
 }
@@ -417,6 +427,39 @@ impl Store {
         Ok(changes)
     }
 
+    /// Observed runway switches grouped by local date, oldest day first.
+    /// `limit` caps the number of days; 0 returns every recorded day.
+    pub fn runway_daily(&self, limit: usize) -> Result<Vec<RunwayDay>> {
+        let changes = self.runway_history(0)?;
+        let mut days: Vec<RunwayDay> = Vec::new();
+        for change in changes {
+            let date = change
+                .observed_at
+                .get(0..10)
+                .unwrap_or(&change.observed_at)
+                .to_string();
+            match days.last_mut() {
+                Some(day) if day.date == date => {
+                    day.switches += 1;
+                    day.last_arrival = change.arrival;
+                    day.last_departure = change.departure;
+                }
+                _ => days.push(RunwayDay {
+                    date,
+                    switches: 1,
+                    first_arrival: change.arrival.clone(),
+                    first_departure: change.departure.clone(),
+                    last_arrival: change.arrival,
+                    last_departure: change.departure,
+                }),
+            }
+        }
+        if limit > 0 && days.len() > limit {
+            days = days.split_off(days.len() - limit);
+        }
+        Ok(days)
+    }
+
     pub fn prune(&self, keep_days: i64) -> Result<usize> {
         let connection = self.connection.lock().expect("store lock poisoned");
         let cutoff = (api::hk_now() - chrono::Duration::days(keep_days))
@@ -539,6 +582,25 @@ mod tests {
         assert_eq!(history[1].arrival, "25R");
         assert_eq!(store.runway_history(1).unwrap().len(), 1);
         assert_eq!(store.runway_history(0).unwrap().len(), 2);
+
+        let daily = store.runway_daily(0).unwrap();
+        assert_eq!(daily.len(), 1);
+        assert_eq!(daily[0].date, "2026-11-22");
+        assert_eq!(daily[0].switches, 2);
+        assert_eq!(daily[0].first_arrival, "07C");
+        assert_eq!(daily[0].last_arrival, "25R");
+        assert_eq!(daily[0].last_departure, "25C");
+
+        assert!(
+            store
+                .record_runway("2026-11-23T05:00:00+08:00", "07L", "07C")
+                .unwrap()
+        );
+        let daily = store.runway_daily(0).unwrap();
+        assert_eq!(daily.len(), 2);
+        assert_eq!(daily[1].date, "2026-11-23");
+        assert_eq!(store.runway_daily(1).unwrap().len(), 1);
+        assert_eq!(store.runway_daily(1).unwrap()[0].date, "2026-11-23");
     }
 
     #[test]

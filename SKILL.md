@@ -268,8 +268,10 @@ crosswind for the arrival runway. The source is the official CAD ATIS page on
   report the error.
 - `hkia watch` prints and notifies when the runway changes; `--no-runway`
   disables that check. Each observed switch is stored in SQLite, and
-  `hkia runway --history [--limit N]` lists them oldest first. History only
-  covers periods when `watch` was running; it is not an official record.
+  `hkia runway --history [--limit N] [--daily]` lists them oldest first, or
+  grouped per day with the switch count and first/last runway. History only
+  covers periods when `watch` was running; it is not an official record. The
+  last 20 switches are also exposed as `hkia://runway/history`.
 
 ## Watchlist and notifications
 
@@ -390,6 +392,7 @@ MCP resources:
 - `hkia://access/checkin/CX` (any airline code)
 - `hkia://access/bus/A11` (any A-route)
 - `hkia://runway/status`
+- `hkia://runway/history` (locally observed switches, last 20)
 
 Resources are JSON and support read plus legacy subscribe/unsubscribe; updates
 are polled every 30 seconds. Prefer `wait_for_changes` for push-style clients.
