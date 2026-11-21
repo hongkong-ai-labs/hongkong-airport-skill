@@ -13,6 +13,7 @@ use std::time::Duration;
 
 use crate::access::Source;
 use crate::api::{hk_now, hk_offset};
+use crate::store::RunwayChange;
 
 pub const ATIS_URL: &str = "https://atis.cad.gov.hk/ATIS/ATISweb/atis.php";
 pub const ATIS_SOURCE: &str = "https://www.hkatc.gov.hk/";
@@ -432,15 +433,44 @@ fn favoured_runway(direction: u16, speed: u16) -> Option<&'static str> {
     Some(if headwind >= -5 { "07" } else { "25" })
 }
 
-/// "arrivals 07C, departures 07R" when the ATIS names a runway.
-pub fn runway_summary(status: &RunwayStatus) -> Option<String> {
-    let arrival = status.arrival.as_ref()?.runway.clone()?;
-    let departure = status
-        .departure
-        .as_ref()
-        .and_then(|report| report.runway.clone())
-        .unwrap_or_else(|| arrival.clone());
-    Some(format!("arrivals {arrival}, departures {departure}"))
+pub fn history_table(changes: &[RunwayChange]) -> String {
+    if changes.is_empty() {
+        return "No runway switches recorded yet. Run `hkia watch` to observe them.\n".to_string();
+    }
+    let mut output = format!(
+        "Observed runway switches  |  {} row(s)  |  local store\n",
+        changes.len()
+    );
+    for change in changes {
+        let stamp = change
+            .observed_at
+            .get(0..16)
+            .unwrap_or(&change.observed_at)
+            .replace('T', " ");
+        output.push_str(&format!(
+            "{stamp}  arrivals {}  departures {}\n",
+            change.arrival, change.departure
+        ));
+    }
+    output
+}
+
+pub fn history_csv(changes: &[RunwayChange], header: bool) -> Result<String> {
+    let mut writer = csv::Writer::from_writer(Vec::new());
+    if header {
+        writer.write_record(["observed_at", "arrival", "departure"])?;
+    }
+    for change in changes {
+        writer.write_record([
+            change.observed_at.clone(),
+            change.arrival.clone(),
+            change.departure.clone(),
+        ])?;
+    }
+    let bytes = writer
+        .into_inner()
+        .map_err(|error| anyhow!("writing CSV: {error}"))?;
+    String::from_utf8(bytes).map_err(|error| anyhow!("CSV was not UTF-8: {error}"))
 }
 
 fn observation_label(wind: &WindObservation) -> String {
@@ -816,7 +846,6 @@ mod tests {
         assert!(table.contains("favours RWY 07"));
         assert!(table.contains("Northeast"));
         assert!(table.contains("HTTP 503"));
-        assert_eq!(runway_summary(&status), None);
 
         let csv = runway_csv(&status, true).unwrap();
         assert!(csv.contains("wind,"));
@@ -825,12 +854,27 @@ mod tests {
     }
 
     #[test]
-    fn runway_summary_matches_the_atis() {
-        let status = parse_atis(&fixture(), now()).unwrap();
-        assert_eq!(
-            runway_summary(&status).as_deref(),
-            Some("arrivals 07C, departures 07R")
-        );
+    fn renders_history_table_and_csv() {
+        let changes = vec![
+            RunwayChange {
+                observed_at: "2026-11-22T01:00:00+08:00".to_string(),
+                arrival: "07C".to_string(),
+                departure: "07R".to_string(),
+            },
+            RunwayChange {
+                observed_at: "2026-11-22T04:30:00+08:00".to_string(),
+                arrival: "25R".to_string(),
+                departure: "25C".to_string(),
+            },
+        ];
+        let table = history_table(&changes);
+        assert!(table.contains("2 row(s)"));
+        assert!(table.contains("2026-11-22 04:30  arrivals 25R"));
+        assert!(history_table(&[]).contains("No runway switches"));
+        let csv = history_csv(&changes, true).unwrap();
+        assert!(csv.starts_with("observed_at,arrival,departure"));
+        assert!(csv.contains("25R,25C"));
+        assert_eq!(history_csv(&changes, false).unwrap().lines().count(), 2);
     }
 
     #[test]

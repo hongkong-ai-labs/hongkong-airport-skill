@@ -262,7 +262,7 @@ the complete flag set, including per-command filters such as `--flight`,
 | `flights` | Board with `-D/--direction` |
 | `flight <number>` | One flight across both boards and codeshares, with guidance |
 | `delays` | Flights delayed beyond a threshold |
-| `alerts` | Cancellations and delays, optional watchlist and weather |
+| `alerts` | Cancellations and delays, with optional watchlist, weather, AEL status and runway |
 | `watch` | Poll and print status/gate/belt changes, plus AEL status and runway changes |
 | `stats` | Single-day stats, or historical range analytics |
 | `history <number>` | Locally observed status/gate timeline |
@@ -422,6 +422,7 @@ hkia access trip --station KOW --airline CX --time 07:40 --terminal T1 --buffer 
 hkia runway                            # arrival/departure runway in use
 hkia runway --json
 hkia runway --csv
+hkia runway --history                  # locally observed switches (from watch)
 ```
 
 `ael` is live: it reads the MTR Next Train API through data.gov.hk and returns
@@ -482,6 +483,7 @@ runway separately along with the ATIS letter and issue time.
 hkia runway
 hkia runway --json
 hkia runway --csv
+hkia runway --history
 ```
 
 The output also gives the airport wind from the ATIS and the computed
@@ -508,7 +510,22 @@ both the ATIS and the HKO feed fail, it returns an error instead.
 
 `hkia watch` polls the runway with the rest of the board and prints, notifies
 and webhooks when the arrival or departure runway changes (`--no-runway` skips
-those checks, `--no-ael` skips the AEL status).
+those checks, `--no-ael` skips the AEL status). `hkia alerts` includes the
+current runway and AEL status too, with the same `--no-runway` / `--no-ael`
+opt-outs.
+
+Every observed switch is also written to the local SQLite store, so
+`hkia runway --history` shows what this machine actually saw, oldest first:
+
+```bash
+hkia runway --history
+hkia runway --history --limit 50 --json
+hkia runway --history --csv
+```
+
+There is no public historical runway feed; the history only covers periods when
+`hkia watch` was running, and a switch is recorded once per change, not per
+poll.
 
 ## MCP
 

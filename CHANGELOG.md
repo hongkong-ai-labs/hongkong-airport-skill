@@ -25,6 +25,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `hkia watch` reports runway-in-use changes alongside flight, AEL and weather
   changes, with desktop/webhook delivery and `--no-runway` to opt out.
 - MCP `get_alerts` includes the runway in use (and gains `include_runway`).
+- CLI `hkia alerts` reports the runway in use with `--no-runway` to opt out,
+  matching `watch` and the existing AEL status.
+- Runway switches observed by `watch` are stored in SQLite (90-day retention)
+  and listed by `hkia runway --history [--limit N]` as a table, JSON or CSV.
 - Official MTR Airport Express fares, including child and 30-day round-trip
   fares, replacing hand-maintained fare tables.
 - AEL delay status in `hkia alerts` and `hkia watch` (including change

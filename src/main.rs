@@ -110,7 +110,7 @@ enum Command {
     /// Airport Express trains, status and trip planning, in-town check-in and buses
     Access(AccessArgs),
     /// Which runway is in use, with the airport wind
-    Runway,
+    Runway(RunwayArgs),
     /// Manage the targeted watchlist config
     Watchlist(WatchlistArgs),
     /// Run the MCP server over stdio, streamable HTTP or SSE
@@ -244,6 +244,9 @@ struct AlertArgs {
     /// Skip the Airport Express line-status check
     #[arg(long)]
     no_ael: bool,
+    /// Skip the runway-in-use check
+    #[arg(long)]
+    no_runway: bool,
     /// Send a desktop notification when alerts are found
     #[arg(long)]
     notify: bool,
@@ -391,6 +394,16 @@ struct BusArgs {
 }
 
 #[derive(Args)]
+struct RunwayArgs {
+    /// Show locally observed runway switches instead of the live status
+    #[arg(long)]
+    history: bool,
+    /// Maximum history rows; 0 shows all
+    #[arg(short, long, default_value_t = 20)]
+    limit: usize,
+}
+
+#[derive(Args)]
 struct TripArgs {
     /// Flight departure time in Hong Kong time, HH:MM
     #[arg(long)]
@@ -510,8 +523,8 @@ async fn main() -> Result<()> {
         Command::Access(ref args) => {
             run_access(&cli, args).await?;
         }
-        Command::Runway => {
-            run_runway(&cli).await?;
+        Command::Runway(ref args) => {
+            run_runway(&cli, args).await?;
         }
         Command::Watchlist(ref args) => {
             run_watchlist(&cli, args)?;
@@ -617,7 +630,23 @@ async fn run_access(cli: &Cli, args: &AccessArgs) -> Result<()> {
     Ok(())
 }
 
-async fn run_runway(cli: &Cli) -> Result<()> {
+async fn run_runway(cli: &Cli, args: &RunwayArgs) -> Result<()> {
+    if args.history {
+        let store = open_store(cli)?;
+        let changes = store.runway_history(args.limit)?;
+        if cli.json {
+            print_json(&json!({
+                "generatedAt": api::hk_now().to_rfc3339_opts(SecondsFormat::Secs, false),
+                "count": changes.len(),
+                "changes": changes,
+            }))?;
+        } else if cli.csv {
+            print!("{}", runway::history_csv(&changes, !cli.no_header)?);
+        } else {
+            print!("{}", runway::history_table(&changes));
+        }
+        return Ok(());
+    }
     let status = runway::fetch().await?;
     if cli.json {
         print_json(&serde_json::to_value(&status)?)?;
@@ -863,6 +892,11 @@ async fn run_alerts(cli: &Cli, args: &AlertArgs) -> Result<()> {
             }
         }
     };
+    let runway_status = if args.no_runway {
+        None
+    } else {
+        runway::fetch().await.ok()
+    };
     let webhook = args.webhook.clone().or(config.notify.webhook.clone());
     let desktop = args.notify || config.notify.desktop;
     let mut notified = 0usize;
@@ -904,6 +938,7 @@ async fn run_alerts(cli: &Cli, args: &AlertArgs) -> Result<()> {
                     "watchlist": watchlist_used,
                     "weather": weather_report,
                     "airportExpress": ael_status,
+                    "runway": runway_status,
                     "alerts": selected,
                 });
                 match notify::webhook(&url, &payload).await {
@@ -931,6 +966,7 @@ async fn run_alerts(cli: &Cli, args: &AlertArgs) -> Result<()> {
             "watchlist": watchlist_used,
             "weather": weather_report,
             "airportExpress": ael_status,
+            "runway": runway_status,
             "notified": notified,
             "totalAlerts": total,
             "count": alerts.len(),
@@ -953,6 +989,9 @@ async fn run_alerts(cli: &Cli, args: &AlertArgs) -> Result<()> {
         }
         if let Some(status) = &ael_status {
             print!("\n{}", access::status_table(status));
+        }
+        if let Some(status) = &runway_status {
+            print!("\n{}", runway::runway_table(status));
         }
         if notified > 0 {
             print!("\nNotified {notified} new alert(s).\n");
@@ -1041,9 +1080,20 @@ async fn run_watch(cli: &Cli, args: &WatchArgs) -> Result<()> {
         } else {
             runway::fetch().await.ok()
         };
-        let current_runway = runway_status.as_ref().and_then(runway::runway_summary);
+        let current_runway = runway_status.as_ref().and_then(|status| {
+            let arrival = status.arrival.as_ref()?.runway.clone()?;
+            let departure = status
+                .departure
+                .as_ref()
+                .and_then(|report| report.runway.clone())
+                .unwrap_or_else(|| arrival.clone());
+            Some((arrival, departure))
+        });
+        let current_key = current_runway
+            .as_ref()
+            .map(|(arrival, departure)| format!("arrivals {arrival}, departures {departure}"));
         let runway_event = if baseline_taken {
-            match (&last_runway, &current_runway) {
+            match (&last_runway, &current_key) {
                 (Some(previous), Some(current)) if previous != current => {
                     Some(format!("Runway in use changed: {previous} -> {current}"))
                 }
@@ -1052,7 +1102,12 @@ async fn run_watch(cli: &Cli, args: &WatchArgs) -> Result<()> {
         } else {
             None
         };
-        last_runway = current_runway.or(last_runway);
+        last_runway = current_key.or(last_runway);
+        if let Some((arrival, departure)) = &current_runway
+            && let Err(error) = store.record_runway(&now, arrival, departure)
+        {
+            eprintln!("warning: {error}");
+        }
 
         if !baseline_taken {
             let alerts = build_alerts(&current, minimum, include_cancelled);

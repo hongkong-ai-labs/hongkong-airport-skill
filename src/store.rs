@@ -33,6 +33,13 @@ pub struct StoredEvent {
     pub summary: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct RunwayChange {
+    pub observed_at: String,
+    pub arrival: String,
+    pub departure: String,
+}
+
 pub struct Store {
     connection: Mutex<Connection>,
 }
@@ -107,6 +114,13 @@ impl Store {
                 fingerprint TEXT NOT NULL,
                 notified_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS runway_changes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                observed_at TEXT NOT NULL,
+                arrival TEXT NOT NULL,
+                departure TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_runway_time ON runway_changes(observed_at);
             ",
         )?;
         Ok(())
@@ -359,6 +373,50 @@ impl Store {
         Ok(count as usize)
     }
 
+    /// Remember the runway in use, returning true when it differs from the last row.
+    pub fn record_runway(&self, observed_at: &str, arrival: &str, departure: &str) -> Result<bool> {
+        let connection = self.connection.lock().expect("store lock poisoned");
+        let previous: Option<(String, String)> = connection
+            .query_row(
+                "SELECT arrival, departure FROM runway_changes ORDER BY id DESC LIMIT 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        if previous
+            .as_ref()
+            .is_some_and(|(last_arrival, last_departure)| {
+                last_arrival == arrival && last_departure == departure
+            })
+        {
+            return Ok(false);
+        }
+        connection.execute(
+            "INSERT INTO runway_changes (observed_at, arrival, departure) VALUES (?1, ?2, ?3)",
+            params![observed_at, arrival, departure],
+        )?;
+        Ok(true)
+    }
+
+    /// Locally observed runway switches, oldest first.
+    pub fn runway_history(&self, limit: usize) -> Result<Vec<RunwayChange>> {
+        let connection = self.connection.lock().expect("store lock poisoned");
+        let limit = if limit == 0 { i64::MAX } else { limit as i64 };
+        let mut statement = connection.prepare(
+            "SELECT observed_at, arrival, departure FROM runway_changes ORDER BY id DESC LIMIT ?1",
+        )?;
+        let rows = statement.query_map(params![limit], |row| {
+            Ok(RunwayChange {
+                observed_at: row.get(0)?,
+                arrival: row.get(1)?,
+                departure: row.get(2)?,
+            })
+        })?;
+        let mut changes = rows.collect::<rusqlite::Result<Vec<_>>>()?;
+        changes.reverse();
+        Ok(changes)
+    }
+
     pub fn prune(&self, keep_days: i64) -> Result<usize> {
         let connection = self.connection.lock().expect("store lock poisoned");
         let cutoff = (api::hk_now() - chrono::Duration::days(keep_days))
@@ -367,7 +425,11 @@ impl Store {
             "DELETE FROM flight_events WHERE observed_at < ?1",
             params![cutoff],
         )?;
-        Ok(removed)
+        let removed_runway = connection.execute(
+            "DELETE FROM runway_changes WHERE observed_at < ?1",
+            params![cutoff],
+        )?;
+        Ok(removed + removed_runway)
     }
 }
 
@@ -450,6 +512,33 @@ mod tests {
         )
         .unwrap()
         .flights
+    }
+
+    #[test]
+    fn records_runway_switches_once() {
+        let store = Store::open_in_memory().unwrap();
+        assert!(
+            store
+                .record_runway("2026-11-22T01:00:00+08:00", "07C", "07R")
+                .unwrap()
+        );
+        assert!(
+            !store
+                .record_runway("2026-11-22T01:01:00+08:00", "07C", "07R")
+                .unwrap()
+        );
+        assert!(
+            store
+                .record_runway("2026-11-22T02:00:00+08:00", "25R", "25C")
+                .unwrap()
+        );
+        let history = store.runway_history(10).unwrap();
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].arrival, "07C");
+        assert_eq!(history[0].departure, "07R");
+        assert_eq!(history[1].arrival, "25R");
+        assert_eq!(store.runway_history(1).unwrap().len(), 1);
+        assert_eq!(store.runway_history(0).unwrap().len(), 2);
     }
 
     #[test]

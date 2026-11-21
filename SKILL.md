@@ -216,6 +216,7 @@ hkia access trip --station KOW --airline CX --time 07:40 --terminal T1 --buffer 
 # Runway in use
 hkia runway
 hkia runway --json
+hkia runway --history
 ```
 
 - `ael` is **live** from the MTR Next Train API. Stations: `HOK`, `KOW`, `TSY`,
@@ -266,7 +267,9 @@ crosswind for the arrival runway. The source is the official CAD ATIS page on
   do not present the favoured runway as the runway in use. If both feeds fail,
   report the error.
 - `hkia watch` prints and notifies when the runway changes; `--no-runway`
-  disables that check.
+  disables that check. Each observed switch is stored in SQLite, and
+  `hkia runway --history [--limit N]` lists them oldest first. History only
+  covers periods when `watch` was running; it is not an official record.
 
 ## Watchlist and notifications
 
@@ -304,8 +307,9 @@ The local SQLite store is at `$HKIA_DATA_DIR/hkia.db`,
 `$XDG_DATA_HOME/hkia/hkia.db`, or `~/.local/share/hkia/hkia.db`. Watch ticks,
 `history`, notification-enabled alert checks, and MCP history/watch calls record
 observations. Events are appended only when status, delay, gate, terminal, belt,
-or stand changes. `history` shows what this machine observed, not an official
-airport audit trail. Data older than 90 days is pruned opportunistically.
+or stand changes. `history` shows what this machine observed, not an official airport audit trail.
+The same applies to `hkia runway --history`, which stores one row per observed
+runway switch. Data older than 90 days is pruned opportunistically.
 
 ## MCP
 
