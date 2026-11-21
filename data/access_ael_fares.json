@@ -1,0 +1,135 @@
+{
+  "checked_on": "2026-11-22",
+  "fares": [
+    {
+      "adult_octopus_hkd": 120.0,
+      "adult_single_hkd": 130.0,
+      "child_octopus_hkd": 60.0,
+      "child_single_hkd": 65.0,
+      "from": "HOK",
+      "round_trip_30d_hkd": 215.0,
+      "to": "AIR"
+    },
+    {
+      "adult_octopus_hkd": 120.0,
+      "adult_single_hkd": 130.0,
+      "child_octopus_hkd": 60.0,
+      "child_single_hkd": 65.0,
+      "from": "HOK",
+      "round_trip_30d_hkd": null,
+      "to": "AWE"
+    },
+    {
+      "adult_octopus_hkd": 105.0,
+      "adult_single_hkd": 115.0,
+      "child_octopus_hkd": 52.5,
+      "child_single_hkd": 57.5,
+      "from": "KOW",
+      "round_trip_30d_hkd": 195.0,
+      "to": "AIR"
+    },
+    {
+      "adult_octopus_hkd": 105.0,
+      "adult_single_hkd": 115.0,
+      "child_octopus_hkd": 52.5,
+      "child_single_hkd": 57.5,
+      "from": "KOW",
+      "round_trip_30d_hkd": null,
+      "to": "AWE"
+    },
+    {
+      "adult_octopus_hkd": 73.0,
+      "adult_single_hkd": 80.0,
+      "child_octopus_hkd": 36.5,
+      "child_single_hkd": 40.0,
+      "from": "TSY",
+      "round_trip_30d_hkd": 130.0,
+      "to": "AIR"
+    },
+    {
+      "adult_octopus_hkd": 73.0,
+      "adult_single_hkd": 80.0,
+      "child_octopus_hkd": 36.5,
+      "child_single_hkd": 40.0,
+      "from": "TSY",
+      "round_trip_30d_hkd": null,
+      "to": "AWE"
+    },
+    {
+      "adult_octopus_hkd": 120.0,
+      "adult_single_hkd": 130.0,
+      "child_octopus_hkd": 60.0,
+      "child_single_hkd": 65.0,
+      "from": "AIR",
+      "round_trip_30d_hkd": 215.0,
+      "to": "HOK"
+    },
+    {
+      "adult_octopus_hkd": 105.0,
+      "adult_single_hkd": 115.0,
+      "child_octopus_hkd": 52.5,
+      "child_single_hkd": 57.5,
+      "from": "AIR",
+      "round_trip_30d_hkd": 195.0,
+      "to": "KOW"
+    },
+    {
+      "adult_octopus_hkd": 73.0,
+      "adult_single_hkd": 80.0,
+      "child_octopus_hkd": 36.5,
+      "child_single_hkd": 40.0,
+      "from": "AIR",
+      "round_trip_30d_hkd": 130.0,
+      "to": "TSY"
+    },
+    {
+      "adult_octopus_hkd": 6.5,
+      "adult_single_hkd": 7.0,
+      "child_octopus_hkd": 3.2,
+      "child_single_hkd": 3.5,
+      "from": "AIR",
+      "round_trip_30d_hkd": null,
+      "to": "AWE"
+    },
+    {
+      "adult_octopus_hkd": 120.0,
+      "adult_single_hkd": 130.0,
+      "child_octopus_hkd": 60.0,
+      "child_single_hkd": 65.0,
+      "from": "AWE",
+      "round_trip_30d_hkd": null,
+      "to": "HOK"
+    },
+    {
+      "adult_octopus_hkd": 105.0,
+      "adult_single_hkd": 115.0,
+      "child_octopus_hkd": 52.5,
+      "child_single_hkd": 57.5,
+      "from": "AWE",
+      "round_trip_30d_hkd": null,
+      "to": "KOW"
+    },
+    {
+      "adult_octopus_hkd": 73.0,
+      "adult_single_hkd": 80.0,
+      "child_octopus_hkd": 36.5,
+      "child_single_hkd": 40.0,
+      "from": "AWE",
+      "round_trip_30d_hkd": null,
+      "to": "TSY"
+    },
+    {
+      "adult_octopus_hkd": 6.5,
+      "adult_single_hkd": 7.0,
+      "child_octopus_hkd": 3.2,
+      "child_single_hkd": 3.5,
+      "from": "AWE",
+      "round_trip_30d_hkd": null,
+      "to": "AIR"
+    }
+  ],
+  "source": {
+    "name": "MTR Airport Express fares",
+    "url": "https://opendata.mtr.com.hk/data/airport_express_fares.csv"
+  }
+}

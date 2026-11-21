@@ -1,0 +1,58 @@
+{
+  "airlines": [
+    {
+      "hong_kong_station": "06:00-23:00",
+      "iata": "CX",
+      "icao": "CPA",
+      "kowloon_station": "06:00-15:00",
+      "name": "Cathay Pacific"
+    },
+    {
+      "hong_kong_station": "09:00-18:00",
+      "iata": "CI",
+      "icao": "CAL",
+      "kowloon_station": null,
+      "name": "China Airlines"
+    },
+    {
+      "hong_kong_station": "08:00-14:00",
+      "iata": "BR",
+      "icao": "EVA",
+      "kowloon_station": null,
+      "name": "EVA Air"
+    },
+    {
+      "hong_kong_station": "06:00-19:00",
+      "iata": "HX",
+      "icao": "CRK",
+      "kowloon_station": "06:00-15:00",
+      "name": "Hong Kong Airlines"
+    },
+    {
+      "hong_kong_station": "09:00-18:00",
+      "iata": "AE",
+      "icao": "MDA",
+      "kowloon_station": null,
+      "name": "Mandarin Airlines"
+    },
+    {
+      "hong_kong_station": "07:00-18:00",
+      "iata": "QF",
+      "icao": "QFA",
+      "kowloon_station": "07:00-15:00",
+      "name": "Qantas Airways"
+    },
+    {
+      "hong_kong_station": "09:00-17:20",
+      "iata": "SQ",
+      "icao": "SIA",
+      "kowloon_station": null,
+      "name": "Singapore Airlines"
+    }
+  ],
+  "checked_on": "2026-11-22",
+  "source": {
+    "name": "MTR in-town check-in service",
+    "url": "https://www.mtr.com.hk/en/customer/services/complom_checkin.html"
+  }
+}

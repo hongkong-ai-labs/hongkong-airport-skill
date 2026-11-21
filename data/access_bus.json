@@ -1,0 +1,800 @@
+{
+  "checked_on": "2026-11-22",
+  "routes": [
+    {
+      "destination": "Ap Lei Chau",
+      "fare_from_airport_hkd": 49.7,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 49.7,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "06:50 - 00:20",
+      "live": {
+        "from_airport": {
+          "stop_id": "001837",
+          "stop_name": "Airport (Ground Transportation Centre)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "002202",
+          "stop_name": "Ap Lei Chau (Lee Lok Street)"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Citybus",
+      "route": "A10",
+      "route_url": "https://mobile.citybus.com.hk/nwp3/?f=1&ds=A10&dsmode=1&l=1",
+      "to_airport_hours": "05:30 - 22:30"
+    },
+    {
+      "destination": "North Point Ferry Pier",
+      "fare_from_airport_hkd": 41.9,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 41.9,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "05:35 - 00:30",
+      "live": {
+        "from_airport": {
+          "stop_id": "001837",
+          "stop_name": "Airport (Ground Transportation Centre)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "001249",
+          "stop_name": "North Point Ferry Pier"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Citybus",
+      "route": "A11",
+      "route_url": "https://mobile.citybus.com.hk/nwp3/?f=1&ds=A11&dsmode=1&l=1",
+      "to_airport_hours": "05:10 - 23:30"
+    },
+    {
+      "destination": "Siu Sai Wan (Island Resort)",
+      "fare_from_airport_hkd": 47.1,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 47.1,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "06:00 - 00:15",
+      "live": {
+        "from_airport": {
+          "stop_id": "001837",
+          "stop_name": "Airport (Ground Transportation Centre)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "001382",
+          "stop_name": "Siu Sai Wan (Island Resort)"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Citybus",
+      "route": "A12",
+      "route_url": "https://mobile.citybus.com.hk/nwp3/?f=1&ds=A12&dsmode=1&l=1",
+      "to_airport_hours": "05:30 - 22:30"
+    },
+    {
+      "destination": "Sham Wan",
+      "fare_from_airport_hkd": 47.1,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 47.1,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "21:30 - 23:30",
+      "live": {
+        "from_airport": {
+          "stop_id": "001837",
+          "stop_name": "Airport (Ground Transportation Centre)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "002389",
+          "stop_name": "Sham Wan"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Citybus",
+      "route": "A17",
+      "route_url": "https://mobile.citybus.com.hk/nwp3/?f=1&ds=A17&dsmode=1&l=1",
+      "to_airport_hours": "05:30 - 07:30"
+    },
+    {
+      "destination": "Ho Man Tin",
+      "fare_from_airport_hkd": 34.6,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 34.6,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "12:00 - 24:00",
+      "live": {
+        "from_airport": {
+          "stop_id": "001837",
+          "stop_name": "Airport (Ground Transportation Centre)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "002994",
+          "stop_name": "Ho Man Tin Estate"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Citybus",
+      "route": "A20",
+      "route_url": "https://mobile.citybus.com.hk/nwp3/?f=1&ds=A20&dsmode=1&l=1",
+      "to_airport_hours": "06:35 - 14:35"
+    },
+    {
+      "destination": "Hung Hom Station",
+      "fare_from_airport_hkd": 34.6,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 34.6,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "05:30 - 24:00",
+      "live": {
+        "from_airport": {
+          "stop_id": "001837",
+          "stop_name": "Airport (Ground Transportation Centre)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "001422",
+          "stop_name": "Hung Hom Station"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Citybus",
+      "route": "A21",
+      "route_url": "https://mobile.citybus.com.hk/nwp3/?f=1&ds=A21&dsmode=1&l=1",
+      "to_airport_hours": "05:15 - 24:00"
+    },
+    {
+      "destination": "Lam Tin Station",
+      "fare_from_airport_hkd": 40.8,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 40.8,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "05:20 - 00:10",
+      "live": {
+        "from_airport": {
+          "stop_id": "001837",
+          "stop_name": "Airport (Ground Transportation Centre)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "001519",
+          "stop_name": "Lam Tin Station"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Citybus",
+      "route": "A22",
+      "route_url": "https://mobile.citybus.com.hk/nwp3/?f=1&ds=A22&dsmode=1&l=1",
+      "to_airport_hours": "05:30 - 23:30"
+    },
+    {
+      "destination": "Tsz Wan Shan (North)",
+      "fare_from_airport_hkd": 40.8,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 40.8,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "11:10 - 00:10",
+      "live": {
+        "from_airport": {
+          "stop_id": "001837",
+          "stop_name": "Airport (Ground Transportation Centre)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "001757",
+          "stop_name": "Tsz Wan Shan (North)"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Citybus",
+      "route": "A23",
+      "route_url": "https://mobile.citybus.com.hk/nwp3/?f=1&ds=A23&dsmode=1&l=1",
+      "to_airport_hours": "05:10 - 21:40"
+    },
+    {
+      "destination": "Kai Tak",
+      "fare_from_airport_hkd": 40.8,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 40.8,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "10:00 - 00:30 ",
+      "live": {
+        "from_airport": {
+          "stop_id": "001837",
+          "stop_name": "Airport (Ground Transportation Centre)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "003835",
+          "stop_name": "Kai Tak - AIRSIDE"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Citybus",
+      "route": "A25",
+      "route_url": "https://mobile.citybus.com.hk/nwp3/?f=1&ds=A25&dsmode=1&l=1",
+      "to_airport_hours": "05:10 - 21:40"
+    },
+    {
+      "destination": "Yau Tong",
+      "fare_from_airport_hkd": 44.0,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 44.0,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "11:35 - 23:35",
+      "live": {
+        "from_airport": {
+          "stop_id": "001837",
+          "stop_name": "Airport (Ground Transportation Centre)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "001792",
+          "stop_name": "Yau Tong"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Citybus",
+      "route": "A26",
+      "route_url": "https://mobile.citybus.com.hk/nwp3/?f=1&ds=A26&dsmode=1&l=1",
+      "to_airport_hours": "06:00 - 20:30"
+    },
+    {
+      "destination": "LOHAS Park",
+      "fare_from_airport_hkd": 44.0,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 44.0,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "11:20 - 00:20",
+      "live": {
+        "from_airport": {
+          "stop_id": "001837",
+          "stop_name": "Airport (Ground Transportation Centre)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "003329",
+          "stop_name": "LOHAS Park"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Citybus",
+      "route": "A28",
+      "route_url": "https://mobile.citybus.com.hk/nwp3/?f=1&ds=A28&dsmode=1&l=1",
+      "to_airport_hours": "05:25 - 20:35"
+    },
+    {
+      "destination": "Tseung Kwan O Station",
+      "fare_from_airport_hkd": null,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 44.0,
+      "fare_to_airport_note": null,
+      "from_airport_hours": null,
+      "live": {
+        "from_airport": null,
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "002918",
+          "stop_name": "Tseung Kwan O Station"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [
+        "*4 departures daily"
+      ],
+      "operator": "Citybus",
+      "route": "A28X",
+      "route_url": "https://mobile.citybus.com.hk/nwp3/?f=1&ds=A28X&dsmode=1&l=1",
+      "to_airport_hours": "05:50 / 06:20 / 06:50 / 07:20*"
+    },
+    {
+      "destination": "Tseung Kwan O (Po Lam)",
+      "fare_from_airport_hkd": 44.0,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 44.0,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "06:10 - 00:10",
+      "live": {
+        "from_airport": {
+          "stop_id": "001837",
+          "stop_name": "Airport (Ground Transportation Centre)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "001700",
+          "stop_name": "Po Lam Station"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Citybus",
+      "route": "A29",
+      "route_url": "https://mobile.citybus.com.hk/nwp3/?f=1&ds=A29&dsmode=1&l=1",
+      "to_airport_hours": "05:15 - 23:30"
+    },
+    {
+      "destination": "Lei Muk Shue",
+      "fare_from_airport_hkd": 19.8,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 19.8,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "06:00 - 24:00",
+      "live": {
+        "from_airport": {
+          "stop_id": "D3564BFD1FE1DB08",
+          "stop_name": "AIRPORT (GTC)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "419036314897BEEE",
+          "stop_name": "LEI MUK SHUE BUS TERMINUS"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Long Win",
+      "route": "A30",
+      "route_url": "https://search.kmb.hk/KMBWebSite/?action=routesearch&route=A30&lang=en",
+      "to_airport_hours": "05:20 - 23:40"
+    },
+    {
+      "destination": "Tsuen Wan (Nina Tower)",
+      "fare_from_airport_hkd": 19.8,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 19.8,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "05:30 - 24:00",
+      "live": {
+        "from_airport": {
+          "stop_id": "7CB61EFB024D9025",
+          "stop_name": "AIRPORT (GTC)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "708870108A511AF7",
+          "stop_name": "NINA TOWER BUS TERMINUS"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Long Win",
+      "route": "A31",
+      "route_url": "https://search.kmb.hk/KMBWebSite/?action=routesearch&route=A31&lang=en",
+      "to_airport_hours": "05:20 - 24:00"
+    },
+    {
+      "destination": "Kwai Chung Estate",
+      "fare_from_airport_hkd": 19.8,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 19.8,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "06:15 - 23:55",
+      "live": {
+        "from_airport": {
+          "stop_id": "D3564BFD1FE1DB08",
+          "stop_name": "AIRPORT (GTC)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "DC825DF01C49316F",
+          "stop_name": "KWAI CHUNG ESTATE BUS TERMINUS"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Long Win",
+      "route": "A32",
+      "route_url": "https://search.kmb.hk/KMBWebSite/?action=routesearch&route=A32&lang=en",
+      "to_airport_hours": "05:10 - 23:25"
+    },
+    {
+      "destination": "Tuen Mun (Tuen Mun Bus Interchange)",
+      "fare_from_airport_hkd": 15.7,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 15.7,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "07:50 - 24:00",
+      "live": {
+        "from_airport": {
+          "stop_id": "0713774B2DB5E4D3",
+          "stop_name": "AIRPORT (GTC)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "64FC3B939BC09903",
+          "stop_name": "TUEN MUN ROAD BBI"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Long Win",
+      "route": "A33",
+      "route_url": "https://search.kmb.hk/KMBWebSite/?action=routesearch&route=A33&lang=en",
+      "to_airport_hours": "05:15 - 22:15"
+    },
+    {
+      "destination": "Tuen Mun (Fu Tai)",
+      "fare_from_airport_hkd": 15.7,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 15.7,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "05:45 - 24:00",
+      "live": {
+        "from_airport": {
+          "stop_id": "86218AD69549D7B2",
+          "stop_name": "AIRPORT (GTC)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "CBCE32D56C5263A9",
+          "stop_name": "FU TAI ESTATE BUS TERMINUS"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Long Win",
+      "route": "A33X",
+      "route_url": "https://search.kmb.hk/KMBWebSite/?action=routesearch&route=A33X&lang=en",
+      "to_airport_hours": "05:00 - 23:45"
+    },
+    {
+      "destination": "Hung Shui Kiu (Hung Yuen Road)",
+      "fare_from_airport_hkd": 15.7,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 15.7,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "09:00 - 24:00",
+      "live": {
+        "from_airport": {
+          "stop_id": "1C7EDE6D51378E58",
+          "stop_name": "AIRPORT (GTC)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "E24E05B38AA2D28E",
+          "stop_name": "HUNG SHUI KIU (HUNG YUEN ROAD) BUS TERMINUS"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Long Win",
+      "route": "A34",
+      "route_url": "https://search.kmb.hk/KMBWebSite/?action=routesearch&route=A34&lang=en",
+      "to_airport_hours": "05:20 - 22:30"
+    },
+    {
+      "destination": "Mui Wo",
+      "fare_from_airport_hkd": 17.8,
+      "fare_from_airport_note": "HK$30 on Sundays and public holidays",
+      "fare_to_airport_hkd": 20.0,
+      "fare_to_airport_note": "HK$32.4 on Sundays and public holidays",
+      "from_airport_hours": "06:15 / 06:40 / 08:30 / 18:15 / 23:30*",
+      "live": {
+        "from_airport": {
+          "stop_id": "117",
+          "stop_name": "Airport (Passenger Terminal Building)"
+        },
+        "nlb_from_airport_route_id": 91,
+        "nlb_to_airport_route_id": 90,
+        "to_airport": {
+          "stop_id": "1",
+          "stop_name": "Mui Wo Ferry Pier"
+        }
+      },
+      "notes_from_airport": [
+        "*5 departures daily"
+      ],
+      "notes_to_airport": [
+        "*5 departures daily"
+      ],
+      "operator": "New Lantao",
+      "route": "A35",
+      "route_url": "https://www.nlb.com.hk/route/detail/90",
+      "to_airport_hours": "00:15 / 05:30 / 07:25 / 17:00 / 22:00*"
+    },
+    {
+      "destination": "Kam Sheung Road Station",
+      "fare_from_airport_hkd": 19.8,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 19.8,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "05:15 - 24:00",
+      "live": {
+        "from_airport": {
+          "stop_id": "B8BAF95E90D6E16E",
+          "stop_name": "AIRPORT (GTC)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "A7156FD2BD44D128",
+          "stop_name": "KAM SHEUNG ROAD STATION"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Long Win",
+      "route": "A36",
+      "route_url": "https://search.kmb.hk/KMBWebSite/?action=routesearch&route=A36&lang=en",
+      "to_airport_hours": "05:10 - 23:30"
+    },
+    {
+      "destination": "Long Ping Station",
+      "fare_from_airport_hkd": 19.8,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 19.8,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "09:00 - 24:00",
+      "live": {
+        "from_airport": {
+          "stop_id": "93A608CBFD9D5128",
+          "stop_name": "AIRPORT (GTC)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "334A391D9FD2C201",
+          "stop_name": "LONG PING STATION"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Long Win",
+      "route": "A37",
+      "route_url": "https://search.kmb.hk/KMBWebSite/?action=routesearch&route=A37&lang=en",
+      "to_airport_hours": "05:00 - 22:30"
+    },
+    {
+      "destination": "Tsuen Wan (Allway Gardens)",
+      "fare_from_airport_hkd": 19.8,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 19.8,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "09:05 - 23:55",
+      "live": {
+        "from_airport": {
+          "stop_id": "7CB61EFB024D9025",
+          "stop_name": "AIRPORT (GTC)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "6D12ACD9163EDD99",
+          "stop_name": "ALLWAY GARDENS BUS TERMINUS"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Long Win",
+      "route": "A38",
+      "route_url": "https://search.kmb.hk/KMBWebSite/?action=routesearch&route=A38&lang=en",
+      "to_airport_hours": "05:35 - 22:35"
+    },
+    {
+      "destination": "Sha Tin (Shek Mun)",
+      "fare_from_airport_hkd": 23.4,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 23.4,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "05:35 - 24:00",
+      "live": {
+        "from_airport": {
+          "stop_id": "5E1FA939586B3FD1",
+          "stop_name": "AIRPORT (GTC)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "24F7097D1D913EC5",
+          "stop_name": "SHEK MUN BUS TERMINUS"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Long Win",
+      "route": "A41",
+      "route_url": "https://search.kmb.hk/KMBWebSite/?action=routesearch&route=A41&lang=en",
+      "to_airport_hours": "05:25 - 23:30"
+    },
+    {
+      "destination": "Wu Kai Sha Station",
+      "fare_from_airport_hkd": 29.0,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 29.0,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "07:05 - 24:00*",
+      "live": {
+        "from_airport": {
+          "stop_id": "D23DB06513E5F202",
+          "stop_name": "AIRPORT (GTC)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "BA72214DFE48AA86",
+          "stop_name": "WU KAI SHA STATION"
+        }
+      },
+      "notes_from_airport": [
+        "*17:55 departed for Sai Sha Residences daily"
+      ],
+      "notes_to_airport": [
+        "*07:30 departed from Sai Sha Residences daily"
+      ],
+      "operator": "Long Win",
+      "route": "A41P",
+      "route_url": "https://search.kmb.hk/KMBWebSite/?action=routesearch&route=A41P&lang=en",
+      "to_airport_hours": "05:20 - 22:45*"
+    },
+    {
+      "destination": "Sha Tin (Wong Nai Tau)",
+      "fare_from_airport_hkd": 23.4,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 23.4,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "10:00 - 24:00",
+      "live": {
+        "from_airport": {
+          "stop_id": "23F3D6C7BDAD87EB",
+          "stop_name": "AIRPORT (GTC)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "9DB1F8ED716CD77E",
+          "stop_name": "WONG NAI TAU BUS TERMINUS"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Long Win",
+      "route": "A42",
+      "route_url": "https://search.kmb.hk/KMBWebSite/?action=routesearch&route=A42&lang=en",
+      "to_airport_hours": "05:35 - 21:35"
+    },
+    {
+      "destination": "Fanling (Luen Wo Hui)",
+      "fare_from_airport_hkd": 32.4,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 32.4,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "06:30 - 24:00",
+      "live": {
+        "from_airport": {
+          "stop_id": "93DD7DA7A8D5BFE7",
+          "stop_name": "AIRPORT (GTC)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "B63202433AD89E92",
+          "stop_name": "LUEN WO HUI BUS TERMINUS"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Long Win",
+      "route": "A43",
+      "route_url": "https://search.kmb.hk/KMBWebSite/?action=routesearch&route=A43&lang=en",
+      "to_airport_hours": "05:10 - 23:00"
+    },
+    {
+      "destination": "Fanling (Luen Wo Hui)",
+      "fare_from_airport_hkd": 32.4,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 32.4,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "12:30 - 24:00*",
+      "live": {
+        "from_airport": {
+          "stop_id": "93DD7DA7A8D5BFE7",
+          "stop_name": "AIRPORT (GTC)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "B63202433AD89E92",
+          "stop_name": "LUEN WO HUI BUS TERMINUS"
+        }
+      },
+      "notes_from_airport": [
+        "*17:30 departed for Queen's Hill daily"
+      ],
+      "notes_to_airport": [
+        "*06:05 and 06:50 departed from Queen's Hill daily"
+      ],
+      "operator": "Long Win",
+      "route": "A43P",
+      "route_url": "https://search.kmb.hk/KMBWebSite/?action=routesearch&route=A43P&lang=en",
+      "to_airport_hours": "05:30 - 15:40*"
+    },
+    {
+      "destination": "Fo Tan (Royal Ascot)",
+      "fare_from_airport_hkd": 23.4,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 23.4,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "05:35 - 24:00",
+      "live": {
+        "from_airport": {
+          "stop_id": "23F3D6C7BDAD87EB",
+          "stop_name": "AIRPORT (GTC)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "666187E9CF307E3D",
+          "stop_name": "ROYAL ASCOT BUS TERMINUS"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Long Win",
+      "route": "A46",
+      "route_url": "https://search.kmb.hk/KMBWebSite/?action=routesearch&route=A46&lang=en",
+      "to_airport_hours": "05:50 - 23:30"
+    },
+    {
+      "destination": "Tai Po (Tai Wo)",
+      "fare_from_airport_hkd": 29.0,
+      "fare_from_airport_note": null,
+      "fare_to_airport_hkd": 29.0,
+      "fare_to_airport_note": null,
+      "from_airport_hours": "10:05 - 24:00",
+      "live": {
+        "from_airport": {
+          "stop_id": "6B689FA123E9E1A6",
+          "stop_name": "AIRPORT (GTC)"
+        },
+        "nlb_from_airport_route_id": null,
+        "nlb_to_airport_route_id": null,
+        "to_airport": {
+          "stop_id": "5B5C877D02DF4C31",
+          "stop_name": "TAI WO BUS TERMINUS"
+        }
+      },
+      "notes_from_airport": [],
+      "notes_to_airport": [],
+      "operator": "Long Win",
+      "route": "A47X",
+      "route_url": "https://search.kmb.hk/KMBWebSite/?action=routesearch&route=A47X&lang=en",
+      "to_airport_hours": "05:00 - 22:05"
+    }
+  ],
+  "source": {
+    "name": "HKIA public buses",
+    "url": "https://www.hongkongairport.com/en/transport/to-from-airport/public-buses.page"
+  }
+}
