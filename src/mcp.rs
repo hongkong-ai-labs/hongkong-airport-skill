@@ -604,9 +604,13 @@ struct WeatherArgs {
 #[derive(Debug, Deserialize, JsonSchema)]
 struct RunwayHistoryArgs {
     #[schemars(
-        description = "Maximum switches to return, newest first. Default 20; 0 returns every stored switch."
+        description = "Maximum switches to return, oldest first. Default 20; 0 returns every stored switch. With daily, caps the number of days instead."
     )]
     limit: Option<usize>,
+    #[schemars(
+        description = "Group switches by local date instead of listing them, like the CLI --daily flag; returns days with switch counts and first/last runway."
+    )]
+    daily: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1170,21 +1174,21 @@ impl HkiaServer {
     }
 
     #[tool(
-        description = "Get the runway switches observed locally while `hkia watch` was running, newest first, with the arrival/departure runway pair and the time it was seen. This is a local observation log, not an official record; use get_runway_status for the runway in use now."
+        description = "Get the runway switches observed locally while `hkia watch` was running, oldest first, with the arrival/departure runway pair and when each was seen. `limit` keeps the most recent N (default 20); `daily` groups them by local date with switch counts and first/last runway. This is a local observation log, not an official record; use get_runway_status for the runway in use now."
     )]
     async fn get_runway_history(
         &self,
         Parameters(args): Parameters<RunwayHistoryArgs>,
     ) -> Result<String, ErrorData> {
-        let changes = self
-            .store
-            .runway_history(args.limit.unwrap_or(20))
-            .map_err(mcp_error)?;
-        Ok(serde_json::to_string_pretty(&json!({
-            "count": changes.len(),
-            "changes": changes,
-        }))
-        .unwrap_or_else(|_| "{}".to_string()))
+        let limit = args.limit.unwrap_or(20);
+        let payload = if args.daily.unwrap_or(false) {
+            let days = self.store.runway_daily(limit).map_err(mcp_error)?;
+            json!({ "count": days.len(), "days": days })
+        } else {
+            let changes = self.store.runway_history(limit).map_err(mcp_error)?;
+            json!({ "count": changes.len(), "changes": changes })
+        };
+        Ok(serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".to_string()))
     }
 
     #[tool(
@@ -1347,7 +1351,14 @@ impl HkiaServer {
             }
             ["runway", "status"] => {
                 let status = runway::fetch().await.map_err(mcp_error)?;
-                Ok(serde_json::to_string_pretty(&status).unwrap_or_else(|_| "{}".to_string()))
+                let last_change = self
+                    .store
+                    .runway_history(1)
+                    .ok()
+                    .and_then(|changes| changes.into_iter().next());
+                let value =
+                    runway::status_json(&status, last_change.as_ref()).map_err(mcp_error)?;
+                Ok(serde_json::to_string_pretty(&value).unwrap_or_else(|_| "{}".to_string()))
             }
             ["access", "bus", route] => {
                 let direction = access::BusDirection::Both;

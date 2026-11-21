@@ -40,6 +40,15 @@ fn run(args: &[&str]) -> (bool, String, String) {
     run_with(&temp_path("cli.db"), &temp_path("cli.toml"), args)
 }
 
+/// Today and yesterday in Hong Kong time, so seeded rows stay inside the
+/// store's 90-day retention window whenever the suite runs.
+fn hk_today_and_yesterday() -> (chrono::NaiveDate, chrono::NaiveDate) {
+    let offset = chrono::FixedOffset::east_opt(8 * 3600).expect("UTC+8 offset");
+    let today = chrono::Utc::now().with_timezone(&offset).date_naive();
+    let yesterday = today.pred_opt().expect("previous day");
+    (today, yesterday)
+}
+
 #[test]
 fn runway_history_daily_reports_seeded_days() {
     let db = temp_path("runway-daily.db");
@@ -47,11 +56,8 @@ fn runway_history_daily_reports_seeded_days() {
     let (ok, _, stderr) = run_with(&db, &config, &["runway", "--history"]);
     assert!(ok, "creating the store failed: {stderr}");
 
-    // Seed through SQLite so the test stays offline and deterministic. Dates
-    // are relative to today so the 90-day prune never removes the rows.
-    let offset = chrono::FixedOffset::east_opt(8 * 3600).expect("UTC+8 offset");
-    let today = chrono::Utc::now().with_timezone(&offset).date_naive();
-    let yesterday = today.pred_opt().expect("previous day");
+    // Seed through SQLite so the test stays offline and deterministic.
+    let (today, yesterday) = hk_today_and_yesterday();
     let connection = rusqlite::Connection::open(&db).expect("open seeded store");
     connection
         .execute_batch(&format!(
@@ -291,6 +297,67 @@ fn trip_planner_rejects_airport_side_stations() {
     assert!(stderr.contains("HOK, KOW or TSY"), "stderr: {stderr}");
 }
 
+#[test]
+fn mcp_runway_history_tool_groups_seeded_switches() {
+    let db = temp_path("mcp-runway.db");
+    let config = temp_path("mcp-runway.toml");
+    let (ok, _, stderr) = run_with(&db, &config, &["runway", "--history"]);
+    assert!(ok, "creating the store failed: {stderr}");
+
+    let (today, yesterday) = hk_today_and_yesterday();
+    let connection = rusqlite::Connection::open(&db).expect("open seeded store");
+    connection
+        .execute_batch(&format!(
+            "INSERT INTO runway_changes (observed_at, arrival, departure) VALUES
+             ('{yesterday}T09:15:00+08:00', '07C', '07R'),
+             ('{yesterday}T11:40:00+08:00', '25R', '25C'),
+             ('{today}T05:05:00+08:00', '07L', '07C');"
+        ))
+        .expect("seed runway changes");
+    drop(connection);
+
+    let mut mcp = Mcp::start_with(&db, &config);
+    mcp.initialize();
+
+    let recent = tool_payload(&mcp.call(
+        2,
+        "tools/call",
+        serde_json::json!({ "name": "get_runway_history", "arguments": { "limit": 2 } }),
+    ));
+    assert_eq!(recent["count"], 2);
+    assert_eq!(recent["changes"][0]["arrival"], "25R", "{recent}");
+    assert_eq!(recent["changes"][1]["arrival"], "07L", "{recent}");
+
+    let all = tool_payload(&mcp.call(
+        3,
+        "tools/call",
+        serde_json::json!({ "name": "get_runway_history" }),
+    ));
+    assert_eq!(all["count"], 3);
+
+    let daily = tool_payload(&mcp.call(
+        4,
+        "tools/call",
+        serde_json::json!({ "name": "get_runway_history", "arguments": { "daily": true } }),
+    ));
+    assert_eq!(daily["count"], 2);
+    assert_eq!(daily["days"][0]["date"], yesterday.to_string());
+    assert_eq!(daily["days"][0]["switches"], 2);
+    assert_eq!(daily["days"][1]["switches"], 1);
+    assert!(
+        daily.get("changes").is_none(),
+        "daily payload should not list switches: {daily}"
+    );
+
+    let daily_one = tool_payload(&mcp.call(
+        5,
+        "tools/call",
+        serde_json::json!({ "name": "get_runway_history", "arguments": { "daily": true, "limit": 1 } }),
+    ));
+    assert_eq!(daily_one["count"], 1);
+    assert_eq!(daily_one["days"][0]["date"], today.to_string());
+}
+
 struct Mcp {
     child: Child,
     stdin: ChildStdin,
@@ -299,12 +366,16 @@ struct Mcp {
 
 impl Mcp {
     fn start() -> Self {
+        Self::start_with(&temp_path("mcp.db"), &temp_path("mcp.toml"))
+    }
+
+    fn start_with(db: &std::path::Path, config: &std::path::Path) -> Self {
         let mut child = hkia()
             .arg("mcp")
             .arg("--db")
-            .arg(temp_path("mcp.db"))
+            .arg(db)
             .arg("--config")
-            .arg(temp_path("mcp.toml"))
+            .arg(config)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -330,6 +401,25 @@ impl Mcp {
             stdin,
             responses,
         }
+    }
+
+    fn initialize(&mut self) {
+        let id = self.send(serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": { "name": "hkia-tests", "version": "0" }
+            }
+        }));
+        let init = self.response(id);
+        assert!(init["result"]["serverInfo"]["name"].is_string());
+        self.send(serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized",
+        }));
     }
 
     fn send(&mut self, message: serde_json::Value) -> u64 {
@@ -392,23 +482,7 @@ fn tool_payload(request: &serde_json::Value) -> serde_json::Value {
 #[test]
 fn mcp_routes_access_modes_and_resources() {
     let mut mcp = Mcp::start();
-    let init = mcp.send(serde_json::json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {
-            "protocolVersion": "2025-06-18",
-            "capabilities": {},
-            "clientInfo": { "name": "hkia-tests", "version": "0" }
-        }
-    }));
-    let init = mcp.response(init);
-    assert!(init["result"]["serverInfo"]["name"].is_string());
-
-    mcp.send(serde_json::json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-    }));
+    mcp.initialize();
 
     let tools = mcp.call(2, "tools/list", serde_json::json!({}));
     let names = tools["result"]["tools"]
