@@ -24,4 +24,6 @@ ENV HKIA_DATA_DIR=/data \
 USER hkia
 EXPOSE 8787
 ENTRYPOINT ["hkia"]
-CMD ["departures"]
+# Default to the HTTP MCP server for containers and the Cloudflare Worker.
+# Override the command for CLI use, e.g. `docker run --rm hkia departures`.
+CMD ["mcp", "--transport", "http", "--host", "0.0.0.0", "--port", "8787"]

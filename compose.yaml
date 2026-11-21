@@ -15,7 +15,7 @@ services:
     environment:
       HKIA_DATA_DIR: /data
       HKIA_CONFIG: /config/config.toml
-      HKIA_AUTH_TOKEN: ${HKIA_AUTH_TOKEN:-}
+      HKIA_MCP_API_KEY: ${HKIA_MCP_API_KEY:-}
     volumes:
       - hkia-data:/data
       - hkia-config:/config
