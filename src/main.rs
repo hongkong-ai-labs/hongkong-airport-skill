@@ -106,7 +106,7 @@ enum Command {
     Stats(StatsArgs),
     /// Show the observed status/gate timeline for a flight
     History(HistoryArgs),
-    /// Airport Express trains, in-town check-in and airport buses
+    /// Airport Express trains, status and trip planning, in-town check-in and buses
     Access(AccessArgs),
     /// Manage the targeted watchlist config
     Watchlist(WatchlistArgs),
@@ -553,8 +553,7 @@ async fn run_access(cli: &Cli, args: &AccessArgs) -> Result<()> {
             }
         }
         AccessCommand::Bus(bus) => {
-            let mut response =
-                access::bus_with_direction(bus.route.as_deref(), bus.direction)?;
+            let mut response = access::bus_with_direction(bus.route.as_deref(), bus.direction)?;
             if !bus.no_live && bus.route.is_some() {
                 let client = access::AccessClient::new(Duration::from_secs(cli.cache_ttl))?;
                 for route in response.routes.clone() {
@@ -576,10 +575,7 @@ async fn run_access(cli: &Cli, args: &AccessArgs) -> Result<()> {
                 bail!("--csv is not supported for `access trip`");
             }
             let station = access::parse_station(&trip.station).ok_or_else(|| {
-                anyhow::anyhow!(
-                    "unknown station '{}'; use HOK, KOW or TSY",
-                    trip.station
-                )
+                anyhow::anyhow!("unknown station '{}'; use HOK, KOW or TSY", trip.station)
             })?;
             let date = resolve_date(trip.date.as_deref())?;
             let time = access::parse_time(&trip.time)?;
@@ -1130,10 +1126,8 @@ async fn run_watch(cli: &Cli, args: &WatchArgs) -> Result<()> {
                     print!("{}", access::status_table(status));
                 }
             }
-            if desktop {
-                if let Err(error) = notify::desktop("HKG: Airport Express", event).await {
-                    eprintln!("warning: {error}");
-                }
+            if desktop && let Err(error) = notify::desktop("HKG: Airport Express", event).await {
+                eprintln!("warning: {error}");
             }
             if let Some(url) = &webhook {
                 let payload = json!({

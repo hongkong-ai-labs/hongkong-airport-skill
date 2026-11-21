@@ -8,13 +8,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- `hkia access ael`, `checkin` and `bus`: live Airport Express next trains from
-  the MTR Next Train API, dated in-town check-in hours for participating
-  airlines, and dated HKIA A-route bus destinations, fares and airport
-  departure windows. All support JSON/CSV; static facts carry `checked_on` and
-  source URLs.
-- MCP tool `get_airport_access` for the same live AEL and dated check-in/bus
-  reference data.
+- `hkia access ael`, `status`, `checkin`, `bus` and `trip`: live Airport
+  Express next trains and delay status from the MTR Next Train API, dated
+  in-town check-in hours for participating airlines, all 30 HKIA A-routes in
+  both directions with fares and city/airport windows, live Citybus, LWB/KMB
+  and NLB ETAs for a chosen route, and an AEL trip planner with an explicit
+  buffer. All support JSON/CSV except `trip`/`status`; static facts carry
+  `checked_on` and source URLs.
+- Official MTR Airport Express fares, including child and 30-day round-trip
+  fares, replacing hand-maintained fare tables.
+- AEL delay status in `hkia alerts` and `hkia watch` (including change
+  notifications) with `--no-ael` to opt out.
+- MCP `get_airport_access` modes `airport-express`, `airport-express-status`,
+  `in-town-checkin`, `airport-bus` and `trip`, plus AEL status in `get_alerts`.
+- MCP resources `hkia://access/ael/{station}`, `hkia://access/ael/status`,
+  `hkia://access/checkin/{airline}` and `hkia://access/bus/{route}`.
+- `scripts/refresh_access_data.py --write/--check` and a weekly scheduled
+  workflow that regenerates or verifies the access reference data against the
+  official HKIA, MTR and operator sources.
+- CLI and MCP integration tests for access JSON shapes, station/direction
+  routing, trip assumptions, and access resource reads.
 - Manual no-Node skill installation, a community Rust `skills-cli` path, and a
   run-mode overview covering CLI, JSON, CSV, watch, Docker and MCP transports.
 - MCP client setup examples for Claude Code, Codex, Cursor, authenticated HTTP

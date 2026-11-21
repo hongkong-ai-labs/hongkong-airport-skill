@@ -224,21 +224,79 @@ pub fn ael_service() -> AelService {
         payment: "Octopus, contactless bank card (adult fare only), QR code, or Airport Express QR Code ticket",
         checked_on: file.checked_on.clone(),
         journey_minutes: vec![
-            JourneyTime { from: "HOK", to: "AIR", minutes: 24 },
-            JourneyTime { from: "KOW", to: "AIR", minutes: 22 },
-            JourneyTime { from: "TSY", to: "AIR", minutes: 14 },
-            JourneyTime { from: "HOK", to: "AWE", minutes: 28 },
-            JourneyTime { from: "KOW", to: "AWE", minutes: 25 },
-            JourneyTime { from: "TSY", to: "AWE", minutes: 18 },
-            JourneyTime { from: "AIR", to: "AWE", minutes: 2 },
+            JourneyTime {
+                from: "HOK",
+                to: "AIR",
+                minutes: 24,
+            },
+            JourneyTime {
+                from: "KOW",
+                to: "AIR",
+                minutes: 22,
+            },
+            JourneyTime {
+                from: "TSY",
+                to: "AIR",
+                minutes: 14,
+            },
+            JourneyTime {
+                from: "HOK",
+                to: "AWE",
+                minutes: 28,
+            },
+            JourneyTime {
+                from: "KOW",
+                to: "AWE",
+                minutes: 25,
+            },
+            JourneyTime {
+                from: "TSY",
+                to: "AWE",
+                minutes: 18,
+            },
+            JourneyTime {
+                from: "AIR",
+                to: "AWE",
+                minutes: 2,
+            },
         ],
         service_windows: vec![
-            ServiceWindow { from: "HOK", to: "AIR", first: "05:50", last: "00:48" },
-            ServiceWindow { from: "KOW", to: "AIR", first: "05:53", last: "00:52" },
-            ServiceWindow { from: "TSY", to: "AIR", first: "06:00", last: "00:59" },
-            ServiceWindow { from: "AIR", to: "HOK", first: "05:54", last: "00:48" },
-            ServiceWindow { from: "AIR", to: "AWE", first: "06:15", last: "01:13" },
-            ServiceWindow { from: "AWE", to: "HOK", first: "06:00", last: "00:45" },
+            ServiceWindow {
+                from: "HOK",
+                to: "AIR",
+                first: "05:50",
+                last: "00:48",
+            },
+            ServiceWindow {
+                from: "KOW",
+                to: "AIR",
+                first: "05:53",
+                last: "00:52",
+            },
+            ServiceWindow {
+                from: "TSY",
+                to: "AIR",
+                first: "06:00",
+                last: "00:59",
+            },
+            ServiceWindow {
+                from: "AIR",
+                to: "HOK",
+                first: "05:54",
+                last: "00:48",
+            },
+            ServiceWindow {
+                from: "AIR",
+                to: "AWE",
+                first: "06:15",
+                last: "01:13",
+            },
+            ServiceWindow {
+                from: "AWE",
+                to: "HOK",
+                first: "06:00",
+                last: "00:45",
+            },
         ],
         fares: file.fares.clone(),
     }
@@ -469,11 +527,15 @@ pub struct CheckinResponse {
 
 fn find_checkin_airline(query: &str) -> Option<CheckinAirline> {
     let normalized = query.trim().to_ascii_uppercase().replace([' ', '-'], "");
-    checkin_file().airlines.iter().find(|airline| {
-        airline.iata == normalized
-            || airline.icao == normalized
-            || airline.name.to_ascii_uppercase().replace([' ', '-'], "") == normalized
-    }).cloned()
+    checkin_file()
+        .airlines
+        .iter()
+        .find(|airline| {
+            airline.iata == normalized
+                || airline.icao == normalized
+                || airline.name.to_ascii_uppercase().replace([' ', '-'], "") == normalized
+        })
+        .cloned()
 }
 
 pub fn checkin(query: &str) -> CheckinResponse {
@@ -829,20 +891,21 @@ impl AccessClient {
     }
 
     async fn fetch_bus_live(&self, route: &BusRoute, direction: BusDirection) -> BusLive {
-        let empty = |stop_id: String, stop_name: String, source_url: String, error: String| BusLive {
-            direction: direction.as_str().to_string(),
-            operator: route.operator.clone(),
-            stop_id,
-            stop_name,
-            available: false,
-            fetched_at: hk_now().to_rfc3339_opts(SecondsFormat::Secs, false),
-            etas: Vec::new(),
-            error: Some(error),
-            source: source_url,
-        };
+        let empty =
+            |stop_id: String, stop_name: String, source_url: String, error: String| BusLive {
+                direction: direction.as_str().to_string(),
+                operator: route.operator.clone(),
+                stop_id,
+                stop_name,
+                available: false,
+                fetched_at: hk_now().to_rfc3339_opts(SecondsFormat::Secs, false),
+                etas: Vec::new(),
+                error: Some(error),
+                source: source_url,
+            };
         let (stop, source_url) = match direction {
             BusDirection::ToAirport => match &route.live.to_airport {
-                Some(stop) => (stop, format!("{}", route.route_url)),
+                Some(stop) => (stop, route.route_url.clone()),
                 None => {
                     return empty(
                         String::new(),
@@ -853,7 +916,7 @@ impl AccessClient {
                 }
             },
             BusDirection::FromAirport => match &route.live.from_airport {
-                Some(stop) => (stop, format!("{}", route.route_url)),
+                Some(stop) => (stop, route.route_url.clone()),
                 None => {
                     return empty(
                         String::new(),
@@ -912,10 +975,7 @@ impl AccessClient {
                 let status = response.status();
                 let body = response.text().await?;
                 if !status.is_success() {
-                    return Err(anyhow!(
-                        "ETA API {url} returned HTTP {}",
-                        status.as_u16()
-                    ));
+                    return Err(anyhow!("ETA API {url} returned HTTP {}", status.as_u16()));
                 }
                 let envelope: BusEtaEnvelope = serde_json::from_str(&body)?;
                 let expected_dir = match direction {
@@ -951,9 +1011,7 @@ impl AccessClient {
                     BusDirection::Both => None,
                 };
                 let Some(route_id) = route_id else {
-                    return Err(anyhow!(
-                        "No NLB route ID is available for this direction."
-                    ));
+                    return Err(anyhow!("No NLB route ID is available for this direction."));
                 };
                 let url = format!(
                     "https://rt.data.gov.hk/v2/transport/nlb/stop.php?action=estimatedArrivals&routeId={route_id}&stopId={}&language=en",
@@ -963,10 +1021,7 @@ impl AccessClient {
                 let status = response.status();
                 let body = response.text().await?;
                 if !status.is_success() {
-                    return Err(anyhow!(
-                        "ETA API {url} returned HTTP {}",
-                        status.as_u16()
-                    ));
+                    return Err(anyhow!("ETA API {url} returned HTTP {}", status.as_u16()));
                 }
                 let envelope: NlbEtaEnvelope = serde_json::from_str(&body)?;
                 let mut etas = Vec::new();
@@ -1286,7 +1341,10 @@ pub fn checkin_table(response: &CheckinResponse) -> String {
                 output.push_str(&format!(
                     "{:<13} {}\n",
                     station.name,
-                    station.hours.as_deref().unwrap_or("Currently not available")
+                    station
+                        .hours
+                        .as_deref()
+                        .unwrap_or("Currently not available")
                 ));
             }
             output.push_str(&format!("\nWindow: {}.\n", response.check_in_window));
@@ -1326,9 +1384,13 @@ pub fn bus_table(response: &BusResponse) -> String {
     if both {
         output.push_str("ROUTE  OPERATOR   DESTINATION                         TO AIRPORT       FROM AIRPORT     FARE\n");
     } else if response.direction == "to-airport" {
-        output.push_str("ROUTE  OPERATOR   DESTINATION                         TO AIRPORT       FARE\n");
+        output.push_str(
+            "ROUTE  OPERATOR   DESTINATION                         TO AIRPORT       FARE\n",
+        );
     } else {
-        output.push_str("ROUTE  OPERATOR   DESTINATION                         FROM AIRPORT     FARE\n");
+        output.push_str(
+            "ROUTE  OPERATOR   DESTINATION                         FROM AIRPORT     FARE\n",
+        );
     }
     for route in &response.routes {
         let to_hours = route.to_airport_hours.as_deref().unwrap_or("-");
@@ -1449,7 +1511,10 @@ pub fn trip_table(response: &AelTrip) -> String {
         output.push_str(&format!("Terminal: {terminal}\n"));
     }
     if let Some(airline) = &response.airline {
-        output.push_str(&format!("Airline: {} ({}/{})\n", airline.name, airline.iata, airline.icao));
+        output.push_str(&format!(
+            "Airline: {} ({}/{})\n",
+            airline.name, airline.iata, airline.icao
+        ));
     }
     output.push_str(&format!(
         "Airport deadline: {} (90 min cutoff + {} min buffer)\n",
@@ -1483,7 +1548,11 @@ pub fn status_table(status: &AelStatus) -> String {
         output.push_str(&format!(
             "- {}: {}\n",
             station.station,
-            if station.delayed { "delay reported" } else { "normal" }
+            if station.delayed {
+                "delay reported"
+            } else {
+                "normal"
+            }
         ));
     }
     for error in &status.errors {
@@ -1520,7 +1589,13 @@ fn truncate(value: &str, width: usize) -> String {
 pub fn ael_csv(response: &AelResponse, header: bool) -> Result<String> {
     let mut writer = csv::Writer::from_writer(Vec::new());
     if header {
-        writer.write_record(["sequence", "destination", "platform", "departs_at", "minutes"])?;
+        writer.write_record([
+            "sequence",
+            "destination",
+            "platform",
+            "departs_at",
+            "minutes",
+        ])?;
     }
     for train in &response.trains {
         writer.write_record([
@@ -1570,8 +1645,14 @@ pub fn bus_csv(response: &BusResponse, header: bool) -> Result<String> {
             route.route.clone(),
             route.operator.clone(),
             route.destination.clone(),
-            route.fare_to_airport_hkd.map(|value| value.to_string()).unwrap_or_default(),
-            route.fare_from_airport_hkd.map(|value| value.to_string()).unwrap_or_default(),
+            route
+                .fare_to_airport_hkd
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+            route
+                .fare_from_airport_hkd
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
             route.to_airport_hours.clone().unwrap_or_default(),
             route.from_airport_hours.clone().unwrap_or_default(),
             route.fare_to_airport_note.clone().unwrap_or_default(),
@@ -1732,8 +1813,14 @@ mod tests {
         assert!(trip.available);
         assert_eq!(trip.assumptions.journey_minutes, 24);
         assert_eq!(time_part(&trip.airport_arrival_deadline), "08:00");
-        assert_eq!(time_part(trip.latest_departure.as_deref().unwrap()), "07:30");
-        assert_eq!(trip.arrival_at_airport.as_deref().map(time_part), Some("07:54".to_string()));
+        assert_eq!(
+            time_part(trip.latest_departure.as_deref().unwrap()),
+            "07:30"
+        );
+        assert_eq!(
+            trip.arrival_at_airport.as_deref().map(time_part),
+            Some("07:54".to_string())
+        );
     }
 
     #[test]
@@ -1755,6 +1842,9 @@ mod tests {
         )
         .unwrap();
         assert_eq!(time_part(&trip.airport_arrival_deadline), "07:50");
-        assert_eq!(time_part(trip.latest_departure.as_deref().unwrap()), "07:23");
+        assert_eq!(
+            time_part(trip.latest_departure.as_deref().unwrap()),
+            "07:23"
+        );
     }
 }

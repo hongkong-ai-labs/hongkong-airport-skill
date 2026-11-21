@@ -1108,7 +1108,7 @@ impl HkiaServer {
     }
 
     #[tool(
-        description = "Get airport access for HKG: live Airport Express trains, dated MTR in-town check-in hours for an airline, or dated HKIA A-route bus destinations, fares and airport departure windows. Check-in and bus data carry checked_on and source fields; they are reference data, not live availability."
+        description = "Get airport access for HKG: live Airport Express trains and delay status, dated MTR in-town check-in hours for an airline, dated HKIA A-route bus windows and fares with live operator ETAs for a single route, or the latest Airport Express departure for a flight (mode=trip with time, station, date, airline, buffer_minutes). Check-in, fare and bus facts carry checked_on and source fields; they are reference data, not live availability."
     )]
     async fn get_airport_access(
         &self,
@@ -1160,9 +1160,8 @@ impl HkiaServer {
                     })?,
                     None => access::BusDirection::Both,
                 };
-                let mut response =
-                    access::bus_with_direction(args.route.as_deref(), direction)
-                        .map_err(mcp_error)?;
+                let mut response = access::bus_with_direction(args.route.as_deref(), direction)
+                    .map_err(mcp_error)?;
                 if args.route.is_some() && !args.no_live.unwrap_or(false) {
                     for route in response.routes.clone() {
                         response
@@ -1260,10 +1259,12 @@ impl HkiaServer {
             }
             ["access", "bus", route] => {
                 let direction = access::BusDirection::Both;
-                let mut response = access::bus_with_direction(Some(route), direction)
-                    .map_err(mcp_error)?;
+                let mut response =
+                    access::bus_with_direction(Some(route), direction).map_err(mcp_error)?;
                 for route in response.routes.clone() {
-                    response.live.extend(self.access.bus_live(&route, direction).await);
+                    response
+                        .live
+                        .extend(self.access.bus_live(&route, direction).await);
                 }
                 Ok(serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".to_string()))
             }

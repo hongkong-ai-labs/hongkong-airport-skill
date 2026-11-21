@@ -126,9 +126,11 @@ hkia departures --cargo --limit 10 --json
 # Airport access
 hkia access ael --station HOK --json
 hkia access ael --station AIR --direction from-airport --json
+hkia access status --json
 hkia access checkin --airline CX --json
 hkia access bus --route A11 --json
-hkia access bus --json
+hkia access bus --route A35 --direction to-airport --json
+hkia access trip --airline CX --time 23:59 --date tomorrow --json
 ```
 
 Run `hkia <command> --help` for per-command filters such as `--flight`,
@@ -202,27 +204,42 @@ commands and keeps the same `--json` / `--csv` conventions.
 ```bash
 hkia access ael --station HOK
 hkia access ael --station KOW --direction both --json
+hkia access status
 hkia access checkin --airline CX
 hkia access checkin --airline CPA --json
 hkia access bus --route A11
+hkia access bus --route A11 --direction from-airport --no-live
 hkia access bus --csv
+hkia access trip --station KOW --airline CX --time 07:40 --terminal T1 --buffer 15
 ```
 
 - `ael` is **live** from the MTR Next Train API. Stations: `HOK`, `KOW`, `TSY`,
   `AIR`, `AWE`. Direction is `to-airport`, `from-airport`, or `both`; it
   defaults from the station. Each response has `trains`, plus `service` with
-  journey times, first/last windows, fares, `checked_on`, and source URLs.
+  journey times, first/last windows, official fares, `checked_on`, and sources.
+- `status` is **live** from the same API's `isdelay` flag at HOK and AIR. Use it
+  for "is the Airport Express disrupted" questions; it reports only whether MTR
+  flagged a delay, not a cause or duration. `alerts` and `watch` include it by
+  default (`--no-ael` disables), and watch notifies when the flag changes.
 - `checkin` is a **dated snapshot** of MTR's published in-town check-in list.
   It matches IATA (`CX`), ICAO (`CPA`) or name. Returns station hours,
   eligibility, baggage limits, `source`, and `checked_on`. It is not live
   availability and does not confirm a specific flight is accepted.
-- `bus` is a **dated snapshot** of the 29 HKIA A-routes. Returns destination,
-  operator, adult fare, and the **from-airport** departure window. It does not
-  include city-to-airport hours, frequency, or live bus ETAs.
+- `bus` is a **dated snapshot** of the 30 HKIA A-routes in both directions,
+  with destination, operator, adult fares and city-to-airport and from-airport
+  windows. With `--route` it adds **live** Citybus/LWB/KMB/NLB ETAs for the
+  published terminus stop; `--direction` selects the direction and `--no-live`
+  keeps it static. ETAs are for the terminus, not the airport kerb.
+- `trip` plans the latest AEL departure for a flight: 90-minute check-in cutoff,
+  explicit `--buffer` (default 0), published journey time, rounded down to the
+  10-minute headway, plus the airport deadline and in-town check-in hours. It
+  never assumes security, immigration or walking time. The time must be in the
+  future Hong Kong time; `--date tomorrow` handles late-night flights today.
 
 The reference snapshot was checked on `2026-11-22`. Always pass through
 `checked_on` and the source URL, and tell the user to confirm with MTR, the
-airline, or the bus operator before travel.
+airline, or the bus operator before travel. `scripts/refresh_access_data.py
+--check` verifies the snapshots against the official sources.
 
 ## Watchlist and notifications
 
@@ -318,8 +335,9 @@ MCP tools:
 - `get_flight_history` — locally observed status/gate/belt timeline
 - `get_historical_stats` — historical range analytics
 - `wait_for_changes` — long-poll for new recorded changes; pass the returned timestamp as `after`
-- `get_airport_access` — live AEL trains, dated in-town check-in hours, or
-  dated A-route bus info (`mode`, `station`, `direction`, `airline`, `route`)
+- `get_airport_access` — modes `airport-express`, `airport-express-status`,
+  `in-town-checkin`, `airport-bus`, `trip` (`station`, `direction`, `airline`,
+  `route`, `time`, `date`, `terminal`, `buffer_minutes`, `no_live`)
 - `get_weather` — current Hong Kong Observatory warnings
 
 Most flight tools take `date`, `direction`, `cargo`, and `lang`; check the tool
@@ -330,6 +348,10 @@ MCP resources:
 - `hkia://board/today/departures`
 - `hkia://board/today/arrivals`
 - `hkia://alerts/today`
+- `hkia://access/ael/status`
+- `hkia://access/ael/HOK` (any station code)
+- `hkia://access/checkin/CX` (any airline code)
+- `hkia://access/bus/A11` (any A-route)
 
 Resources are JSON and support read plus legacy subscribe/unsubscribe; updates
 are polled every 30 seconds. Prefer `wait_for_changes` for push-style clients.
@@ -352,10 +374,14 @@ are polled every 30 seconds. Prefer `wait_for_changes` for push-style clients.
 - The feed is published per calendar day. Future dates may be empty or missing;
   querying tomorrow early in the day can legitimately return no board.
 - Cargo flights live on a separate board: pass `--cargo` / `"cargo": true`.
-- Never invent an Airport Express time, check-in hour, bus route, fare, or
-  departure window. If a lookup fails, say so. In-town check-in and bus data
-  are dated snapshots, not live availability; quote `checked_on`. Bus hours are
-  airport departure windows only, not city-to-airport times.
+- Never invent an Airport Express time, check-in hour, bus route, fare, ETAs,
+  or departure window. If a lookup fails, say so. In-town check-in, fare and
+  bus facts are dated snapshots, not live availability; quote `checked_on`.
+  AEL trains, the delay flag and bus ETAs are live and can be unavailable.
+- The AEL delay flag is a coarse signal. Do not convert it into a delay length,
+  cause, or recommendation to rebook. The trip planner's output is a plan based
+  on published timetables and the stated buffer, not a guarantee of on-time
+  arrival.
 - The live feed may include the previous day's tail; this tool selects the
   requested date. Keep request rates reasonable; responses cache for 20 seconds
   by default (`--cache-ttl 0` disables, `watch` is uncached).

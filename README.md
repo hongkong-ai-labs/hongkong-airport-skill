@@ -23,7 +23,8 @@ the HKIA app and website — and turns it into:
 - a locally persisted timeline of what the airport actually published
 - targeted watchlists with desktop and webhook notifications
 - historical on-time analytics for the feed's D-91 to D+14 window
-- live Airport Express next trains, in-town check-in reference and A-route bus reference
+- live Airport Express trains and delay status, a trip planner, in-town check-in
+  reference, and A-route bus data with live ETAs
 - an installable agent skill (`SKILL.md`)
 
 No API key, no scraping, no browser automation.
@@ -212,9 +213,11 @@ hkia departures --cargo --limit 10
 
 hkia access ael --station HOK           # live Airport Express next trains
 hkia access ael --station AIR --direction from-airport --json
+hkia access status                      # live AEL delay status
 hkia access checkin --airline CX        # dated in-town check-in reference
-hkia access bus --route A11             # dated A-route bus reference
-hkia access bus --csv
+hkia access bus --route A11             # dated windows plus live ETAs
+hkia access trip --airline CX --time 23:59 --date tomorrow --terminal T1
+hkia access bus --route A35 --direction to-airport --json
 ```
 
 Dates accept `YYYY-MM-DD`, `today`, `yesterday`, and `tomorrow`, resolved in
@@ -235,7 +238,7 @@ the complete flag set, including per-command filters such as `--flight`,
 | `watch` | Poll and print status/gate/belt changes |
 | `stats` | Single-day stats, or historical range analytics |
 | `history <number>` | Locally observed status/gate timeline |
-| `access` | `ael`, `checkin`, `bus` airport-access queries |
+| `access` | `ael`, `status`, `checkin`, `bus`, `trip` airport-access queries |
 | `watchlist` | `show`, `add`, `remove`, `set`, `clear` |
 | `mcp` | MCP server over stdio, HTTP, or SSE |
 
@@ -373,13 +376,19 @@ flight commands. It is a separate surface with explicit data provenance.
 hkia access ael --station HOK
 hkia access ael --station AIR --direction from-airport --json
 hkia access ael --station KOW --direction both --csv
+hkia access status --json
 
 hkia access checkin --airline CX
 hkia access checkin --airline CPA --json
 
 hkia access bus --route A11
 hkia access bus --route A35 --json
+hkia access bus --route A31 --direction to-airport --csv
+hkia access bus --route A11 --no-live
 hkia access bus --csv
+
+hkia access trip --airline CX --time 23:59 --date tomorrow
+hkia access trip --station KOW --airline CX --time 07:40 --terminal T1 --buffer 15 --json
 ```
 
 `ael` is live: it reads the MTR Next Train API through data.gov.hk and returns
@@ -387,21 +396,47 @@ upcoming trains, destination, platform and minutes to departure. Stations are
 `HOK`, `KOW`, `TSY`, `AIR` and `AWE`. The direction defaults to `to-airport`
 from Hong Kong, Kowloon and Tsing Yi, and `from-airport` at Airport and
 AsiaWorld-Expo. Each response includes the AEL journey times, first/last train
-windows and published adult/child fares, with `checked_on` and source URLs.
+windows and the official MTR fares (Octopus, single and 30-day round trip,
+adult and child), with `checked_on` and source URLs.
+
+`status` checks the same live API for the `isdelay` flag at Hong Kong and
+Airport and reports whether MTR has flagged an Airport Express delay. It is a
+coarse line-status signal, not a cause or an estimate of how long a delay will
+last. `alerts` and `watch` include this status by default (`--no-ael` skips it),
+and watch mode prints and notifies when the flag changes.
 
 `checkin` is a dated snapshot of MTR's published in-town check-in list, not live
 availability. It matches IATA codes, ICAO codes or airline names and returns
 Hong Kong and Kowloon station hours, the check-in window, eligibility and
-baggage limits. `bus` is a dated snapshot of the 29 HKIA A-routes, with
-destination, operator, adult fare and the **from-airport** departure window.
-City-to-airport hours, frequencies and live bus ETAs are not included.
+baggage limits.
+
+`bus` is a dated snapshot of the 30 HKIA A-routes with both directions:
+destination, operator, adult fares (weekday plus published holiday notes) and
+the city-to-airport and from-airport departure windows. With `--route`, it also
+queries the Citybus, Long Win/KMB or New Lantao live ETA API for the published
+terminus stop; `--direction` picks the direction (default `both`) and
+`--no-live` keeps the output static.
+
+`trip` plans the latest Airport Express departure for a flight. It applies MTR's
+published 90-minute check-in cutoff, adds an explicit `--buffer` (default 0),
+uses the station's published journey time, rounds down to the 10-minute
+headway, and reports the airport arrival deadline and latest train with the
+published first/last train window. It does **not** invent security, immigration
+or walking times, and it shows in-town check-in hours for the station without
+shortening the airport buffer. The flight time must be in the future Hong Kong
+time; use `--date tomorrow` for late-night flights already passed today.
 
 The reference data was checked on **2026-11-22**. Hours, fares and participating
 airlines can change; confirm with MTR, the airline or the bus operator before
-travel. Sources: the MTR Next Train API, MTR Airport Express timetable and fares
-pages, MTR's in-town check-in page, and HKIA's public-bus page; see
-[NOTICE](NOTICE) for the exact URLs. Use `--json` or `--csv` for scripts;
-`--no-header` omits the CSV header.
+travel. Sources: the MTR Next Train API, MTR Airport Express timetable, fares
+CSV and frequency pages, MTR's in-town check-in page, HKIA's public-bus page,
+and the Citybus/LWB/KMB/NLB live ETA APIs; see [NOTICE](NOTICE) for the exact
+URLs. Use `--json` or `--csv` for scripts; `--no-header` omits the CSV header.
+
+`scripts/refresh_access_data.py --write` regenerates the embedded files and
+`--check` compares them with the official sources without updating anything. A
+scheduled GitHub Actions workflow runs the check weekly and opens an issue when
+the data drifts.
 
 ## MCP
 
@@ -541,12 +576,15 @@ the client supports interpolation; do not commit it to a shared config file.
 | `get_historical_stats` | Multi-day range analytics with airline/route/hour/weekday groups |
 | `wait_for_changes` | Long-poll for new recorded changes; use the returned timestamp as the next `after` |
 | `get_weather` | Current Hong Kong Observatory warnings |
-| `get_airport_access` | Live AEL trains, dated in-town check-in hours, or dated A-route bus info |
+| `get_airport_access` | Live AEL trains and status, trip planning, dated in-town check-in hours, or A-route bus data with live ETAs |
 
 Watchlist and history tools use the local SQLite store and config, so the same
 `--db` and `--config` global flags apply. Most flight tools accept `date`,
 `direction`, `cargo`, and `lang`; `get_airport_access` takes `mode`, `station`,
-`direction`, `airline`, and `route`. See each tool's schema for exact names.
+`direction`, `airline`, `route`, `time`, `date`, `terminal`, `buffer_minutes` and
+`no_live`. Its modes are `airport-express`, `airport-express-status`,
+`in-town-checkin`, `airport-bus` and `trip`. See each tool's schema for exact
+names.
 
 ### Resources
 
@@ -555,6 +593,10 @@ Watchlist and history tools use the local SQLite store and config, so the same
 | `hkia://board/today/departures` | Today's departure board JSON |
 | `hkia://board/today/arrivals` | Today's arrival board JSON |
 | `hkia://alerts/today` | Today's cancellations and 15+ minute delays |
+| `hkia://access/ael/status` | Live Airport Express delay flag |
+| `hkia://access/ael/HOK` | Live AEL departures, fares and journey times (use any station code) |
+| `hkia://access/checkin/CX` | Dated in-town check-in hours (use any airline code) |
+| `hkia://access/bus/A11` | Dated A-route windows and fares plus live ETAs (use any route) |
 
 Resources support read and the legacy subscribe/unsubscribe flow. Subscriptions
 poll every 30 seconds and emit `notifications/resources/updated` when the
@@ -603,10 +645,13 @@ serialized resource changes. For reliable push-style integrations, prefer
   departure. `guidance` reflects the currently published fields only.
 - Future dates may return no board until the airport publishes them. Very old
   dates outside D-91 and dates beyond D+14 return a range error.
-- Airport Express train data is live from MTR's Next Train API. In-town
-  check-in and A-route bus data are dated reference snapshots checked
-  `2026-11-22`, not live availability. Bus hours are airport departure windows;
-  city-to-airport times, frequencies and live bus ETAs are out of scope.
+- Airport Express train data, the delay flag and bus ETAs are live from MTR,
+  Citybus, LWB/KMB and NLB APIs. In-town check-in, AEL fare and A-route bus
+  facts are dated reference snapshots checked `2026-11-22`, not live
+  availability. Bus windows are published terminus departure windows, not
+  frequency guarantees, and live ETAs cover the terminus stop only. The trip
+  planner uses the 90-minute cutoff, an explicit buffer and the published
+  journey time; it does not model security, immigration or walking time.
 - Responses are cached for 20 seconds (`--cache-ttl 0` disables it; `watch` is
   uncached). Delay/alert data is only as fresh as the airport feed itself; the
   project makes no uptime or freshness guarantee.
@@ -640,8 +685,10 @@ cargo test --all --locked
 
 Tests cover status parsing, midnight rollover, cancellations, codeshares,
 filters, stats/alerts, the captured board fixture, watchlist matching and
-dedupe, SQLite change detection and notification dedupe, weather parsing, and
-TOML round-tripping. CI runs formatting, clippy, tests, a release build and a
+dedupe, SQLite change detection and notification dedupe, weather parsing, AEL
+parsing and trip planning, bus data, and TOML round-tripping. Integration tests
+exercise the access CLI JSON shapes, station/direction errors, MCP tool mode
+routing and MCP access resources. CI runs formatting, clippy, tests, a release build and a
 SKILL.md/script validation job. Tagged releases verify the tag against
 `Cargo.toml` and `CHANGELOG.md`, build macOS and static Linux binaries, smoke
 test the native artifact, and publish `SHA256SUMS`.
@@ -649,11 +696,12 @@ test the native artifact, and publish `SHA256SUMS`.
 Layout: `src/api.rs` (feed client, normalisation, delays, alerts, stats),
 `src/analytics.rs` (historical ranges), `src/store.rs` (SQLite),
 `src/watchlist.rs` (config and matching), `src/notify.rs` (desktop/webhook),
-`src/weather.rs` (HKO), `src/access.rs` (AEL live client and dated access
-reference data), `src/render.rs` (tables/CSV), `src/mcp.rs` (transports, tools,
-resources), `src/main.rs` (CLI), `scripts/install.sh` (release
-installer), `scripts/ensure-binary.sh` (agent resolver), and `SKILL.md` (agent
-skill).
+`src/weather.rs` (HKO), `src/access.rs` (AEL and bus live clients, trip planner
+and dated reference data), `src/render.rs` (tables/CSV), `src/mcp.rs`
+(transports, tools, resources), `src/main.rs` (CLI), `scripts/install.sh`
+(release installer), `scripts/ensure-binary.sh` (agent resolver),
+`scripts/refresh_access_data.py` (access data generator/checker), and `SKILL.md`
+(agent skill).
 
 ## Data licences
 
