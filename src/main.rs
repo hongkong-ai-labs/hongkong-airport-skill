@@ -45,6 +45,8 @@ impl ColorMode {
     }
 }
 
+mod update;
+
 #[derive(Parser)]
 #[command(
     name = "hkia",
@@ -113,6 +115,15 @@ enum Command {
     Runway(RunwayArgs),
     /// Manage the targeted watchlist config
     Watchlist(WatchlistArgs),
+    /// Update this binary using the method it was installed with
+    Update {
+        /// Only report the current version, latest release and install method
+        #[arg(long)]
+        check: bool,
+        /// Reinstall even when the current version is up to date
+        #[arg(long)]
+        force: bool,
+    },
     /// Run the MCP server over stdio, streamable HTTP or SSE
     Mcp(mcp::McpArgs),
 }
@@ -528,6 +539,9 @@ async fn main() -> Result<()> {
         }
         Command::Watchlist(ref args) => {
             run_watchlist(&cli, args)?;
+        }
+        Command::Update { check, force } => {
+            update::run(check, force)?;
         }
         Command::Mcp(ref args) => {
             mcp::run(

@@ -246,6 +246,7 @@ hkia access checkin --airline CX        # dated in-town check-in reference
 hkia access bus --route A11             # dated windows plus live ETAs
 hkia access trip --airline CX --time 23:59 --date tomorrow --terminal T1
 hkia access bus --route A35 --direction to-airport --json
+hkia update --check
 ```
 
 Dates accept `YYYY-MM-DD`, `today`, `yesterday`, and `tomorrow`, resolved in
