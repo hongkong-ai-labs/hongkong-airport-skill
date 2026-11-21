@@ -132,6 +132,7 @@ hkia access checkin --airline CX --json
 hkia access bus --route A11 --json
 hkia access bus --route A35 --direction to-airport --json
 hkia access trip --airline CX --time 23:59 --date tomorrow --json
+hkia update --check
 ```
 
 Run `hkia <command> --help` for per-command filters such as `--flight`,

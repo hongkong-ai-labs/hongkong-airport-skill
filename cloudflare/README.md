@@ -38,6 +38,19 @@ The endpoint is:
 https://<worker-name>.<account>.workers.dev/mcp
 ```
 
+## Local Worker check
+
+`npx wrangler dev` also needs a working Docker engine because it starts the
+container locally:
+
+```bash
+npx wrangler dev --port 8787
+```
+
+Then use `http://localhost:8787/mcp` as the Worker MCP URL. Port 8787 is also
+the container's internal port; Wrangler exposes the Worker on the same local
+port here, so change `--port` if it is already in use.
+
 ## Transport
 
 Cloudflare's current remote MCP transport is **Streamable HTTP** at `/mcp`.
