@@ -41,6 +41,9 @@ jobs:
       - name: Test
         run: cargo test --all --locked
 
+      - name: Doc
+        run: cargo doc --no-deps --locked
+
       - name: Access data drift
         run: python3 scripts/refresh_access_data.py --check
 

@@ -31,6 +31,10 @@ access-data-check:
 audit:
     @if command -v cargo-audit >/dev/null 2>&1; then cargo audit; else echo "cargo-audit is not installed; skipping (cargo install cargo-audit)"; fi
 
+# Build the API documentation.
+doc:
+    cargo doc --no-deps --locked
+
 # Build the debug binary.
 build:
     cargo build --locked
@@ -94,4 +98,4 @@ clean:
     cargo clean
 
 # Run the checks, the access data drift check and a release build.
-ci: check access-data-check build-release
+ci: check doc access-data-check build-release
