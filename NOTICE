@@ -27,6 +27,30 @@ lookup table is made available under the same ODbL terms.
 Flight data is fetched at runtime from the Hong Kong International Airport public
 flight-information service. It is not bundled with this project.
 
+## Runway in use
+
+Runway in use, the ATIS letter and issue time, and the airport wind are fetched
+at runtime from the Civil Aviation Department's public ATIS page:
+
+- Page: https://atis.cad.gov.hk/ATIS/ATISweb/atis.php
+- Landing page: https://www.hkatc.gov.hk/
+- Provider: Civil Aviation Department, HKSAR Government
+
+The runway-selection policy referenced in the output is published in the Hong
+Kong Aeronautical Information Publication, VHHH AD 2.22:
+https://www.ais.gov.hk/eaip/
+
+When the ATIS page is unavailable, the airport wind is read from the Hong Kong
+Observatory's regional 10-minute wind file (provisional data):
+
+- File: https://data.weather.gov.hk/weatherAPI/hko_data/regional-weather/latest_10min_wind.csv
+- Station: Chek Lap Kok
+- Dataset: https://data.gov.hk/en-data/dataset/hk-hko-rss-latest-ten-minute-wind-info
+- Provider: Hong Kong Observatory
+
+Wind components are computed locally from the reported wind and the runway
+designator. No ATIS text or wind observation is stored.
+
 ## Airport access data
 
 Live Airport Express train times and the AEL delay flag are fetched at runtime
@@ -63,6 +87,6 @@ not a copy of a database, and remain subject to the providers' terms:
   city/airport departure windows:
   https://www.hongkongairport.com/en/transport/to-from-airport/public-buses.page
 
-MTR, Citybus, LWB, KMB, NLB and HKIA are not affiliated with this project and do
-not endorse it. Verify hours, fares and availability with the provider before
-travel.
+MTR, Citybus, LWB, KMB, NLB, HKIA and the Civil Aviation Department are not
+affiliated with this project and do not endorse it. Verify hours, fares,
+runways and availability with the provider before travel.

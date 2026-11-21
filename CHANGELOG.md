@@ -13,8 +13,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   in-town check-in hours for participating airlines, all 30 HKIA A-routes in
   both directions with fares and city/airport windows, live Citybus, LWB/KMB
   and NLB ETAs for a chosen route, and an AEL trip planner with an explicit
-  buffer. All support JSON/CSV except `trip`/`status`; static facts carry
-  `checked_on` and source URLs.
+  buffer. All support JSON and CSV; static facts carry `checked_on` and source
+  URLs.
+- `hkia runway`: the official CAD ATIS runway in use for arrivals and
+  departures, with the ATIS letter and issue time, the reported airport wind,
+  and computed head/tailwind and crosswind components. Available as a table,
+  JSON, CSV, MCP tool `get_runway_status` and `hkia://runway/status` resource.
+  When the ATIS is unavailable it falls back to the HKO 10-minute Chek Lap Kok
+  wind, marks `atis_available: false` and reports only which runway the wind
+  favours under the AIP rule.
+- `hkia watch` reports runway-in-use changes alongside flight, AEL and weather
+  changes, with desktop/webhook delivery and `--no-runway` to opt out.
+- MCP `get_alerts` includes the runway in use (and gains `include_runway`).
+- CLI `hkia alerts` reports the runway in use with `--no-runway` to opt out,
+  matching `watch` and the existing AEL status.
+- Runway switches observed by `watch` are stored in SQLite (90-day retention)
+  and listed by `hkia runway --history [--limit N]` as a table, JSON or CSV.
 - Official MTR Airport Express fares, including child and 30-day round-trip
   fares, replacing hand-maintained fare tables.
 - AEL delay status in `hkia alerts` and `hkia watch` (including change
@@ -25,7 +39,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `hkia://access/checkin/{airline}` and `hkia://access/bus/{route}`.
 - `scripts/refresh_access_data.py --write/--check` and a weekly scheduled
   workflow that regenerates or verifies the access reference data against the
-  official HKIA, MTR and operator sources.
+  official HKIA, MTR and operator sources. The check also runs on pull requests
+  via CI and through `just access-data-check`.
 - CLI and MCP integration tests for access JSON shapes, station/direction
   routing, trip assumptions, and access resource reads.
 - Manual no-Node skill installation, a community Rust `skills-cli` path, and a
