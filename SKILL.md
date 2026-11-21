@@ -7,7 +7,8 @@ license: MIT
 # HKIA flights
 
 `hkia` is a Rust CLI and MCP server for the public Hong Kong International Airport
-flight-information feed. It needs no API key and no account.
+flight-information feed. It needs no API key and no account. It is an
+independent, unofficial project and is not affiliated with the airport.
 
 Use it when the user asks about:
 
@@ -90,11 +91,20 @@ hkia watch --direction arrival --min-delay 20 --json   # NDJSON ticks
 # Filters and formats
 hkia departures --airport LHR --terminal T1 --airline CPA --limit 20 --json
 hkia departures --status disrupted --csv
+hkia departures --lang zh_HK --limit 10 --json
+hkia departures --cargo --limit 10 --json
 ```
+
+Run `hkia <command> --help` for per-command filters such as `--flight`,
+`--airport`, `--airline`, `--terminal`, `--status`, `--delayed-over`, and `--sort`.
 
 The range endpoint covers D-91 through D+14. Historical range reports include
 `by_day`, `by_airline`, `by_route`, `by_weekday`, and `by_hour`; failed days
 appear in `failures`.
+
+`--lang` accepts `en`, `zh_HK`, or `zh_CN` (default `en`). It changes the raw
+status text, not JSON field names or `guidance`, which stay English. All three
+languages are parsed for status type, delay basis, and cancellations.
 
 ## Terminal and gate guidance
 
@@ -144,8 +154,9 @@ walking times between gates, or a per-flight ATC transcript.
 | `fetched_at` | When this observation was fetched |
 
 Delay minutes are computed from the airport's free-text status against the
-scheduled time. They are not airline cause codes and do not distinguish weather,
-crew, slot, or maintenance reasons.
+scheduled time. English, Traditional Chinese, and Simplified Chinese status
+terms are recognised. They are not airline cause codes and do not distinguish
+weather, crew, slot, or maintenance reasons. `guidance` is always English.
 
 ## Watchlist and notifications
 
@@ -205,14 +216,20 @@ Client config for stdio:
 }
 ```
 
+If `hkia` is not on the MCP client's `PATH`, use the absolute path printed by
+`scripts/ensure-binary.sh` as `command`. Restart the client after editing its
+configuration.
+
 For HTTP, point the client at `http://127.0.0.1:8787/mcp`; for SSE, use
 `http://127.0.0.1:8787/sse` (messages are POSTed to the endpoint URL the server
 sends in the `endpoint` event). `GET /health` is available on both network
-transports.
+transports. `--path` changes the streamable HTTP endpoint.
 
 For non-loopback use, set a bearer token with `--auth-token` or
 `HKIA_AUTH_TOKEN`; requests then need `Authorization: Bearer <token>`.
 `--rate-limit` caps HTTP/SSE requests per minute (default 240, `0` disables).
+The server has no TLS of its own and uses one shared static token; bind loopback
+or terminate TLS at a reverse proxy before exposing it.
 
 MCP tools:
 
@@ -239,6 +256,16 @@ MCP resources:
 
 Resources are JSON and support read plus legacy subscribe/unsubscribe; updates
 are polled every 30 seconds. Prefer `wait_for_changes` for push-style clients.
+
+## Troubleshooting
+
+- `ensure-binary.sh` needs either a published release, a checkout with
+  `Cargo.toml`, or `$HKIA_BIN`. If it fails, ask the user for an `hkia` path
+  rather than inventing one.
+- MCP `401` means the bearer token is missing or wrong; `429` means the
+  process-wide rate limit was hit. Read `Retry-After` before retrying.
+- Webhook delivery has a 15-second timeout and no retry queue. Errors are
+  warnings; the watch loop continues.
 
 ## Rules and limits
 

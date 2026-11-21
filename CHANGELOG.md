@@ -14,6 +14,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `stats`: live HKIA schedules, estimated/actual times, computed delays,
   cancellations, codeshares, terminal, gate, stand, check-in aisle, baggage
   belt and arrival hall, as tables, JSON or CSV.
+- English, Traditional Chinese and Simplified Chinese status parsing for
+  departures, arrivals, estimates and cancellations, including the `--lang`
+  option and MCP `lang` parameter.
 - Derived `guidance` strings for departures and arrivals, including gate,
   check-in aisle, stand, baggage belt and arrival hall instructions; cancelled
   flights report `Flight cancelled` instead of directing the user to a gate.
@@ -44,6 +47,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   prebuilt macOS and static Linux binaries, with a source-build fallback.
 - Dockerfile and Compose service for running the HTTP MCP server with
   persistent history and configuration.
+- Documentation for language support, per-command filters, MCP absolute paths
+  and TLS/auth limits, troubleshooting, and the project's unofficial status.
 - Unit and fixture tests for status parsing, midnight rollover, cancellations,
   codeshares, filtering, stats/alerts, watchlist matching, SQLite change
   detection, notification dedupe, weather parsing and TOML round-tripping.

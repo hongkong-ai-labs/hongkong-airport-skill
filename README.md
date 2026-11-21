@@ -27,6 +27,10 @@ the HKIA app and website — and turns it into:
 
 No API key, no scraping, no browser automation.
 
+This is an independent, unofficial project. It is not affiliated with Airport
+Authority Hong Kong or HKIA, it sends no telemetry, and the underlying feed
+remains subject to the airport's own terms.
+
 ## What you get
 
 Schedules, estimated and actual times, computed delays, cancellations, terminal,
@@ -141,10 +145,15 @@ hkia history CX251                    # observed status/gate timeline from SQLit
 hkia watch --interval 60              # poll and print only changes
 hkia watch --watchlist --notify --webhook https://example.test/hook
 hkia departures --airport LHR --terminal T1 --airline CPA --status disrupted --json
+hkia departures --lang zh_HK --limit 5
+hkia departures --cargo --limit 10
 ```
 
 Dates accept `YYYY-MM-DD`, `today`, `yesterday`, and `tomorrow`, resolved in
-Hong Kong time. `--limit 0` returns every match.
+Hong Kong time. `--limit 0` returns every match. Run `hkia <command> --help` for
+the complete flag set, including per-command filters such as `--flight`,
+`--airport`, `--airline`, `--terminal`, `--status`, `--delayed-over` and
+`--sort`.
 
 ### Commands
 
@@ -171,8 +180,14 @@ Hong Kong time. `--limit 0` returns every match.
 | `--color auto\|always\|never` | Table colour policy (default `auto`) |
 | `--sort time\|delay\|flight\|state` | Board sort order (`departures`, `arrivals`, `flights`, `watch`) |
 | `--cache-ttl 20` | Feed cache seconds; `0` disables |
+| `--cargo` | Read the cargo board instead of passenger flights |
+| `--lang en\|zh_HK\|zh_CN` | Raw feed language (default `en`); localized status text is parsed |
 | `--db PATH` | Override the SQLite history database |
 | `--config PATH` | Override the watchlist TOML path |
+
+`--lang` changes the airport's raw status text, not the derived field names or
+`guidance` text, which remain English. All three languages are parsed for status
+type, delay basis and cancellations.
 
 ### JSON
 
@@ -257,13 +272,12 @@ SQLite, so restarting `watch` does not resend the same alert; pass
 ### History and persistence
 
 SQLite lives at `$HKIA_DATA_DIR/hkia.db`, `$XDG_DATA_HOME/hkia/hkia.db`, or
-`~/.local/share/hkia/hkia.db`. Every board read, watch tick, alert check, or MCP
-history call records the observed state and appends an event only when
-status, delay, gate, terminal, belt, or stand changes. Watch ticks, `history`,
-notification-enabled `alerts`, and MCP history/watch calls write observations;
-a plain board read does not. Events older than 90 days are pruned
-opportunistically. `hkia history CX251` is therefore limited to what this machine
-has actually observed — it is not an airport-provided audit log.
+`~/.local/share/hkia/hkia.db`. Watch ticks, `history`,
+notification-enabled `alerts`, and MCP history/watch calls record observations;
+a plain board read does not. Observations append an event only when status,
+delay, gate, terminal, belt, or stand changes. Events older than 90 days are
+pruned opportunistically. `hkia history CX251` is therefore limited to what this
+machine has actually observed — it is not an airport-provided audit log.
 
 ## Historical analytics
 
@@ -295,6 +309,10 @@ valid with `--from` and selects the table/CSV focus.
   }
 }
 ```
+
+If `hkia` is not on the MCP client's `PATH`, replace `"command": "hkia"` with
+an absolute path. `scripts/ensure-binary.sh` prints the path to use. Restart the
+client after changing its MCP configuration.
 
 ### Streamable HTTP
 
@@ -335,8 +353,13 @@ hkia mcp --transport sse --port 8787
 ```
 
 Use `--host 0.0.0.0` to listen beyond loopback. Both network transports expose
-`GET /health` and permissive CORS for local tooling. `/health` stays public;
-`/mcp`, `/sse`, and `/messages` are protected when auth is enabled.
+`GET /health` and permissive CORS for local tooling; `--path` changes the
+streamable HTTP endpoint. `/health` stays public, while `/mcp`, `/sse`, and
+`/messages` are protected when auth is enabled.
+
+The server does not terminate TLS, and the bearer token is one shared static
+secret. Keep the default loopback bind, or put it behind a TLS reverse proxy
+before exposing it to another machine.
 
 ### Auth and rate limiting
 
@@ -382,6 +405,22 @@ poll every 30 seconds and emit `notifications/resources/updated` when the
 serialized resource changes. For reliable push-style integrations, prefer
 `wait_for_changes`.
 
+## Troubleshooting
+
+- **Installer cannot find a release:** the script needs a `v*` release with a
+  matching `<target>.tar.gz`. From a clone, build with
+  `cargo build --release --locked`; setting `HKIA_VERSION` only selects an
+  existing release tag.
+- **Unsupported platform:** prebuilt binaries cover macOS x86_64/arm64 and Linux
+  x86_64/aarch64. Use `cargo install --path . --locked` elsewhere.
+- **MCP returns 401:** the client must send `Authorization: Bearer <token>` when
+  `--auth-token` or `HKIA_AUTH_TOKEN` is set.
+- **MCP returns 429:** the process-wide rate limit was reached; raise
+  `--rate-limit` or wait for `Retry-After`.
+- **Webhook delivery fails:** the request times out after 15 seconds, non-2xx
+  responses are errors, and there is no retry queue. Delivery errors are printed
+  as warnings; the watch loop continues.
+
 ## Configuration
 
 | Variable | Meaning |
@@ -409,7 +448,13 @@ serialized resource changes. For reliable push-style integrations, prefer
 - Future dates may return no board until the airport publishes them. Very old
   dates outside D-91 and dates beyond D+14 return a range error.
 - Responses are cached for 20 seconds (`--cache-ttl 0` disables it; `watch` is
-  uncached). Delay/alert data is only as fresh as the airport feed itself.
+  uncached). Delay/alert data is only as fresh as the airport feed itself; the
+  project makes no uptime or freshness guarantee.
+- Localized status parsing covers English, Traditional Chinese (`zh_HK`) and
+  Simplified Chinese (`zh_CN`) terms such as `Dep`/`啟航`/`启航`,
+  `At gate`/`到閘口`/`到闸口`, `Est`/`預計`/`预计` and
+  `Cancelled`/`取消`. The raw status string still depends on the requested
+  language.
 - **ATC/tower text:** HKIA tower communications are voice radio, and there is
   no public per-flight ATC text or transcription feed. This tool does not
   scrape or transcribe tower audio. It can surface published delays, weather

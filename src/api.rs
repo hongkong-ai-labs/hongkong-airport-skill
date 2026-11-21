@@ -247,7 +247,7 @@ fn parse_status(
     };
 
     let lower = raw.to_ascii_lowercase();
-    if lower.contains("cancel") {
+    if lower.contains("cancel") || raw.contains("取消") {
         return ParsedStatus {
             status_type: "cancelled",
             cancelled: true,
@@ -255,12 +255,29 @@ fn parse_status(
         };
     }
 
-    let estimated = lower.starts_with("est") || lower.contains("expected");
-    let departed = lower.starts_with("dep") || lower.contains("departed");
+    // The feed localises raw status text for lang=zh_HK and lang=zh_CN. Match
+    // both scripts so delay/state/cancellation logic does not depend on the
+    // requested response language.
+    let estimated = lower.starts_with("est")
+        || lower.contains("expected")
+        || raw.contains("預計")
+        || raw.contains("预计");
+    let departed = lower.starts_with("dep")
+        || lower.contains("departed")
+        || raw.contains("啟航")
+        || raw.contains("启航")
+        || raw.contains("出發")
+        || raw.contains("出发");
     let arrived = lower.starts_with("at gate")
         || lower.starts_with("landed")
         || lower.starts_with("arriv")
-        || lower.starts_with("arr ");
+        || lower.starts_with("arr ")
+        || raw.contains("到閘口")
+        || raw.contains("到闸口")
+        || raw.contains("著陸")
+        || raw.contains("着陆")
+        || raw.contains("抵達")
+        || raw.contains("抵达");
 
     let status_type = if estimated {
         "estimated"
@@ -1408,6 +1425,54 @@ mod tests {
         let parsed = parse_status(Some("Cancelled"), board_date, scheduled);
         assert!(parsed.cancelled);
         assert_eq!(parsed.status_type, "cancelled");
+    }
+
+    #[test]
+    fn parses_localized_departure_and_arrival_statuses() {
+        let board_date = date(2026, 11, 20);
+        let scheduled = board_date.and_hms_opt(23, 0, 0).unwrap();
+
+        for raw in ["啟航 00:00 (21/11/2026)", "启航 00:00 (21/11/2026)"] {
+            let parsed = parse_status(Some(raw), board_date, scheduled);
+            assert_eq!(parsed.status_type, "departed", "raw status: {raw}");
+            assert_eq!(
+                parsed.actual.unwrap().to_rfc3339(),
+                "2026-11-21T00:00:00+08:00"
+            );
+        }
+
+        for raw in [
+            "到閘口 00:00 (21/11/2026)",
+            "到闸口 00:00 (21/11/2026)",
+            "著陸於 00:00 (21/11/2026)",
+            "着陆於 00:00 (21/11/2026)",
+        ] {
+            let parsed = parse_status(Some(raw), board_date, scheduled);
+            assert_eq!(parsed.status_type, "arrived", "raw status: {raw}");
+            assert_eq!(
+                parsed.actual.unwrap().to_rfc3339(),
+                "2026-11-21T00:00:00+08:00"
+            );
+        }
+    }
+
+    #[test]
+    fn parses_localized_estimates_and_cancellations() {
+        let board_date = date(2026, 11, 21);
+        let scheduled = board_date.and_hms_opt(23, 55, 0).unwrap();
+
+        for raw in ["預計 00:10", "预计 00:10"] {
+            let parsed = parse_status(Some(raw), board_date, scheduled);
+            assert_eq!(parsed.status_type, "estimated", "raw status: {raw}");
+            assert_eq!(parsed.estimated.unwrap().date_naive(), date(2026, 11, 22));
+            assert!(parsed.actual.is_none());
+        }
+
+        for raw in ["取消", "航班取消"] {
+            let parsed = parse_status(Some(raw), board_date, scheduled);
+            assert!(parsed.cancelled, "raw status: {raw}");
+            assert_eq!(parsed.status_type, "cancelled", "raw status: {raw}");
+        }
     }
 
     #[test]
