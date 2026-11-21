@@ -689,7 +689,7 @@ the key.
 | `wait_for_changes` | Long-poll for new recorded changes; use the returned timestamp as the next `after` |
 | `get_weather` | Current Hong Kong Observatory warnings |
 | `get_runway_status` | Runway in use for arrivals and departures, ATIS wind, wind components and last observed switch |
-| `get_runway_history` | Locally observed runway switches, newest first, with an optional `limit` (default 20, 0 for all) |
+| `get_runway_history` | Locally observed runway switches, oldest first, with an optional `limit` (default 20, 0 for all) and `daily` grouping |
 | `get_airport_access` | Live AEL trains and status, trip planning, dated in-town check-in hours, or A-route bus data with live ETAs |
 
 Watchlist and history tools use the local SQLite store and config, so the same

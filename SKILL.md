@@ -274,8 +274,9 @@ crosswind for the arrival runway. The source is the official CAD ATIS page on
   `hkia runway --history [--limit N] [--daily]` lists them oldest first, or
   grouped per day with the switch count and first/last runway. History only
   covers periods when `watch` was running; it is not an official record. The
-  same rows are available as `get_runway_history` (`limit`, newest first,
-  default 20) and as the `hkia://runway/history` resource (last 20).
+  same rows are available as `get_runway_history` (`limit` keeps the most
+  recent N, default 20; `daily` groups them by date) and as the
+  `hkia://runway/history` resource (last 20).
 
 ## Watchlist and notifications
 
@@ -382,8 +383,8 @@ MCP tools:
 - `get_weather` — current Hong Kong Observatory warnings
 - `get_runway_status` — runway in use for arrivals/departures, ATIS wind, wind
   components and the last locally observed switch, no arguments
-- `get_runway_history` — locally observed switches, newest first; optional
-  `limit` (default 20, 0 returns all)
+- `get_runway_history` — locally observed switches, oldest first; optional
+  `limit` (default 20, 0 returns all) and `daily` grouping
 
 Most flight tools take `date`, `direction`, `cargo`, and `lang`; check the tool
 schema for exact parameter names.
