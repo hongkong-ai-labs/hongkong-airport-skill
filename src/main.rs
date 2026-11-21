@@ -238,6 +238,9 @@ struct AlertArgs {
     /// Include Hong Kong Observatory weather warnings
     #[arg(long)]
     weather: bool,
+    /// Skip the Airport Express line-status check
+    #[arg(long)]
+    no_ael: bool,
     /// Send a desktop notification when alerts are found
     #[arg(long)]
     notify: bool,
@@ -283,6 +286,9 @@ struct WatchArgs {
     /// Show Hong Kong Observatory warnings at baseline
     #[arg(long)]
     weather: bool,
+    /// Skip the Airport Express line-status checks
+    #[arg(long)]
+    no_ael: bool,
 }
 
 #[derive(Args)]
@@ -342,6 +348,10 @@ enum AccessCommand {
     Checkin(CheckinArgs),
     /// Airport A-route buses, fares and airport departure hours
     Bus(BusArgs),
+    /// Latest Airport Express departure for a flight
+    Trip(TripArgs),
+    /// Live Airport Express line status
+    Status,
 }
 
 #[derive(Args)]
@@ -363,9 +373,37 @@ struct CheckinArgs {
 
 #[derive(Args)]
 struct BusArgs {
-    /// Restrict to one route, e.g. A11
+    /// Restrict to one route, e.g. A11; required for live ETAs
     #[arg(long)]
     route: Option<String>,
+    /// Direction: to-airport, from-airport or both (default both)
+    #[arg(long, value_enum, default_value = "both")]
+    direction: access::BusDirection,
+    /// Skip live operator ETA lookups
+    #[arg(long)]
+    no_live: bool,
+}
+
+#[derive(Args)]
+struct TripArgs {
+    /// Flight departure time in Hong Kong time, HH:MM
+    #[arg(long)]
+    time: String,
+    /// Flight date (defaults to today)
+    #[arg(long)]
+    date: Option<String>,
+    /// Airline IATA/ICAO code or name, for in-town check-in hours
+    #[arg(long)]
+    airline: Option<String>,
+    /// Departure terminal, shown for context only, e.g. T1
+    #[arg(long)]
+    terminal: Option<String>,
+    /// Extra minutes on top of the 90-minute check-in cutoff
+    #[arg(long, default_value_t = 0)]
+    buffer: u32,
+    /// City station to start from: HOK, KOW or TSY (default HOK)
+    #[arg(long, default_value = "HOK")]
+    station: String,
 }
 
 #[derive(Args)]
@@ -515,13 +553,61 @@ async fn run_access(cli: &Cli, args: &AccessArgs) -> Result<()> {
             }
         }
         AccessCommand::Bus(bus) => {
-            let response = access::bus(bus.route.as_deref())?;
+            let mut response =
+                access::bus_with_direction(bus.route.as_deref(), bus.direction)?;
+            if !bus.no_live && bus.route.is_some() {
+                let client = access::AccessClient::new(Duration::from_secs(cli.cache_ttl))?;
+                for route in response.routes.clone() {
+                    response
+                        .live
+                        .extend(client.bus_live(&route, bus.direction).await);
+                }
+            }
             if cli.json {
                 print_json(&serde_json::to_value(&response)?)?;
             } else if cli.csv {
                 print!("{}", access::bus_csv(&response, !cli.no_header)?);
             } else {
                 print!("{}", access::bus_table(&response));
+            }
+        }
+        AccessCommand::Trip(trip) => {
+            if cli.csv {
+                bail!("--csv is not supported for `access trip`");
+            }
+            let station = access::parse_station(&trip.station).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "unknown station '{}'; use HOK, KOW or TSY",
+                    trip.station
+                )
+            })?;
+            let date = resolve_date(trip.date.as_deref())?;
+            let time = access::parse_time(&trip.time)?;
+            let response = access::plan_ael_trip(
+                station,
+                trip.airline.as_deref(),
+                date,
+                time,
+                trip.terminal.clone(),
+                trip.buffer,
+                api::hk_now(),
+            )?;
+            if cli.json {
+                print_json(&serde_json::to_value(&response)?)?;
+            } else {
+                print!("{}", access::trip_table(&response));
+            }
+        }
+        AccessCommand::Status => {
+            if cli.csv {
+                bail!("--csv is not supported for `access status`");
+            }
+            let client = access::AccessClient::new(Duration::from_secs(cli.cache_ttl))?;
+            let status = client.ael_status().await?;
+            if cli.json {
+                print_json(&serde_json::to_value(&status)?)?;
+            } else {
+                print!("{}", access::status_table(&status));
             }
         }
     }
@@ -751,6 +837,17 @@ async fn run_alerts(cli: &Cli, args: &AlertArgs) -> Result<()> {
         alerts.truncate(args.limit);
     }
     let weather_report = fetch_weather(&args.lang, args.weather).await;
+    let ael_status = if args.no_ael {
+        None
+    } else {
+        match access::AccessClient::new(Duration::from_secs(cli.cache_ttl)) {
+            Ok(client) => client.ael_status().await.ok(),
+            Err(error) => {
+                eprintln!("warning: {error}");
+                None
+            }
+        }
+    };
     let webhook = args.webhook.clone().or(config.notify.webhook.clone());
     let desktop = args.notify || config.notify.desktop;
     let mut notified = 0usize;
@@ -791,6 +888,7 @@ async fn run_alerts(cli: &Cli, args: &AlertArgs) -> Result<()> {
                     "minDelayMinutes": minimum,
                     "watchlist": watchlist_used,
                     "weather": weather_report,
+                    "airportExpress": ael_status,
                     "alerts": selected,
                 });
                 match notify::webhook(&url, &payload).await {
@@ -817,6 +915,7 @@ async fn run_alerts(cli: &Cli, args: &AlertArgs) -> Result<()> {
             "includeCancelled": include_cancelled,
             "watchlist": watchlist_used,
             "weather": weather_report,
+            "airportExpress": ael_status,
             "notified": notified,
             "totalAlerts": total,
             "count": alerts.len(),
@@ -836,6 +935,9 @@ async fn run_alerts(cli: &Cli, args: &AlertArgs) -> Result<()> {
         );
         if let Some(weather) = &weather_report {
             print!("\n{}", render::weather_lines(weather));
+        }
+        if let Some(status) = &ael_status {
+            print!("\n{}", access::status_table(status));
         }
         if notified > 0 {
             print!("\nNotified {notified} new alert(s).\n");
@@ -872,6 +974,18 @@ async fn run_watch(cli: &Cli, args: &WatchArgs) -> Result<()> {
     let mut baseline_taken = false;
     let interval = Duration::from_secs(args.interval.max(5));
     let weather_report = fetch_weather(&args.common.lang, args.weather).await;
+    let access_client = if args.no_ael {
+        None
+    } else {
+        match access::AccessClient::new(Duration::from_secs(30)) {
+            Ok(client) => Some(client),
+            Err(error) => {
+                eprintln!("warning: {error}");
+                None
+            }
+        }
+    };
+    let mut last_ael: Option<bool> = None;
 
     loop {
         let (flights, last_updated) = fetch_flights(
@@ -888,6 +1002,24 @@ async fn run_watch(cli: &Cli, args: &WatchArgs) -> Result<()> {
         };
         let now = api::hk_now().to_rfc3339_opts(SecondsFormat::Secs, false);
         let changes = store.record(&now, &current, minimum)?;
+        let ael_status = match &access_client {
+            Some(client) => client.ael_status().await.ok(),
+            None => None,
+        };
+        let ael_delayed = ael_status.as_ref().map(|status| status.delayed);
+        let ael_event = if baseline_taken {
+            match (last_ael, ael_delayed) {
+                (Some(previous), Some(current)) if previous != current => Some(if current {
+                    "Airport Express delay reported"
+                } else {
+                    "Airport Express delay cleared"
+                }),
+                _ => None,
+            }
+        } else {
+            None
+        };
+        last_ael = ael_delayed.or(last_ael);
 
         if !baseline_taken {
             let alerts = build_alerts(&current, minimum, include_cancelled);
@@ -900,6 +1032,7 @@ async fn run_watch(cli: &Cli, args: &WatchArgs) -> Result<()> {
                     "trackedFlights": current.len(),
                     "watchlist": watchlist_used,
                     "weather": weather_report,
+                    "airportExpress": ael_status,
                     "alerts": alerts,
                 }))?;
             } else {
@@ -922,6 +1055,9 @@ async fn run_watch(cli: &Cli, args: &WatchArgs) -> Result<()> {
                 if let Some(weather) = &weather_report {
                     print!("\n{}", render::weather_lines(weather));
                 }
+                if let Some(status) = &ael_status {
+                    print!("\n{}", access::status_table(status));
+                }
             }
             baseline_taken = true;
             if !changes.is_empty() {
@@ -934,6 +1070,7 @@ async fn run_watch(cli: &Cli, args: &WatchArgs) -> Result<()> {
                     serde_json::to_string(&json!({
                         "timestamp": now,
                         "watchlist": watchlist_used,
+                        "airportExpress": ael_status,
                         "changes": changes,
                     }))?
                 );
@@ -973,6 +1110,41 @@ async fn run_watch(cli: &Cli, args: &WatchArgs) -> Result<()> {
                 }
                 if !delivered {
                     eprintln!("warning: no notification target accepted the change batch");
+                }
+            }
+        }
+
+        if let Some(event) = ael_event {
+            if cli.json {
+                println!(
+                    "{}",
+                    serde_json::to_string(&json!({
+                        "timestamp": now,
+                        "kind": "airport_express",
+                        "airportExpress": ael_status,
+                    }))?
+                );
+            } else {
+                println!("{now}  {event}");
+                if let Some(status) = &ael_status {
+                    print!("{}", access::status_table(status));
+                }
+            }
+            if desktop {
+                if let Err(error) = notify::desktop("HKG: Airport Express", event).await {
+                    eprintln!("warning: {error}");
+                }
+            }
+            if let Some(url) = &webhook {
+                let payload = json!({
+                    "source": "hkia",
+                    "version": 1,
+                    "kind": "airport_express",
+                    "timestamp": now,
+                    "airportExpress": ael_status,
+                });
+                if let Err(error) = notify::webhook(url, &payload).await {
+                    eprintln!("warning: {error}");
                 }
             }
         }

@@ -461,6 +461,10 @@ struct AlertsArgs {
     include_cancelled: Option<bool>,
     #[schemars(description = "Include Hong Kong Observatory weather warnings")]
     include_weather: Option<bool>,
+    #[schemars(
+        description = "Include the live Airport Express delay flag from the MTR Next Train API. Default true"
+    )]
+    include_ael: Option<bool>,
     #[schemars(description = "Maximum number of alerts to return; 0 returns all. Default 50")]
     limit: Option<usize>,
     #[schemars(description = "Read the cargo board instead of the passenger board")]
@@ -566,7 +570,7 @@ struct WeatherArgs {
 #[derive(Debug, Deserialize, JsonSchema)]
 struct AirportAccessArgs {
     #[schemars(
-        description = "Access mode: airport-express (live AEL trains), in-town-checkin (dated MTR hours) or airport-bus (dated A-route info)"
+        description = "Access mode: airport-express (live AEL trains), airport-express-status (delay flag), in-town-checkin (dated MTR hours), airport-bus (dated A-route info plus live ETAs when route is set) or trip (latest AEL departure for a flight)"
     )]
     mode: String,
     #[schemars(description = "AEL station: HOK, KOW, TSY, AIR or AWE. Default HOK.")]
@@ -580,9 +584,25 @@ struct AirportAccessArgs {
     )]
     airline: Option<String>,
     #[schemars(
-        description = "Airport bus route for airport-bus mode, e.g. A11; omit for all routes"
+        description = "Airport bus route for airport-bus mode, e.g. A11; omit for all routes. Live ETAs are returned only for a single route."
     )]
     route: Option<String>,
+    #[schemars(
+        description = "Flight departure time in Hong Kong time, HH:MM, for trip mode (required there)"
+    )]
+    time: Option<String>,
+    #[schemars(
+        description = "Flight date as YYYY-MM-DD or today/yesterday/tomorrow for trip mode. Defaults to today."
+    )]
+    date: Option<String>,
+    #[schemars(description = "Departure terminal for trip mode, shown for context only, e.g. T1")]
+    terminal: Option<String>,
+    #[schemars(
+        description = "Extra minutes on top of the 90-minute check-in cutoff for trip mode. Default 0."
+    )]
+    buffer_minutes: Option<u32>,
+    #[schemars(description = "Skip live bus ETA lookups in airport-bus mode")]
+    no_live: Option<bool>,
 }
 
 fn mcp_error(error: impl std::fmt::Display) -> ErrorData {
@@ -797,6 +817,11 @@ impl HkiaServer {
         } else {
             None
         };
+        let airport_express = if args.include_ael.unwrap_or(true) {
+            self.access.ael_status().await.ok()
+        } else {
+            None
+        };
         Ok(serde_json::to_string_pretty(&json!({
             "date": date.to_string(),
             "direction": direction.map(|direction| direction.as_str()).unwrap_or("both"),
@@ -808,6 +833,7 @@ impl HkiaServer {
             "count": alerts.len(),
             "alerts": alerts,
             "weather": weather,
+            "airportExpress": airport_express,
         }))
         .unwrap_or_else(|_| "{}".to_string()))
     }
@@ -1121,12 +1147,59 @@ impl HkiaServer {
                 let response = access::checkin(airline);
                 Ok(serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".to_string()))
             }
+            "airport-express-status" | "ael-status" | "status" => {
+                let status = self.access.ael_status().await.map_err(mcp_error)?;
+                Ok(serde_json::to_string_pretty(&status).unwrap_or_else(|_| "{}".to_string()))
+            }
             "airport-bus" | "bus" | "buses" => {
-                let response = access::bus(args.route.as_deref()).map_err(mcp_error)?;
+                let direction = match args.direction.as_deref() {
+                    Some(value) => access::BusDirection::parse(value).ok_or_else(|| {
+                        mcp_error(format!(
+                            "unknown bus direction '{value}'; use to-airport, from-airport or both"
+                        ))
+                    })?,
+                    None => access::BusDirection::Both,
+                };
+                let mut response =
+                    access::bus_with_direction(args.route.as_deref(), direction)
+                        .map_err(mcp_error)?;
+                if args.route.is_some() && !args.no_live.unwrap_or(false) {
+                    for route in response.routes.clone() {
+                        response
+                            .live
+                            .extend(self.access.bus_live(&route, direction).await);
+                    }
+                }
                 Ok(serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".to_string()))
             }
+            "trip" | "trip-planner" | "plan" => {
+                let time = args
+                    .time
+                    .as_deref()
+                    .ok_or_else(|| mcp_error("time (HH:MM) is required for trip mode"))?;
+                let time = access::parse_time(time).map_err(mcp_error)?;
+                let station = access::parse_station(args.station.as_deref().unwrap_or("HOK"))
+                    .ok_or_else(|| {
+                        mcp_error(format!(
+                            "unknown AEL station '{}'; use HOK, KOW or TSY",
+                            args.station.as_deref().unwrap_or("HOK")
+                        ))
+                    })?;
+                let date = api::resolve_date(args.date.as_deref()).map_err(mcp_error)?;
+                let trip = access::plan_ael_trip(
+                    station,
+                    args.airline.as_deref(),
+                    date,
+                    time,
+                    args.terminal.clone(),
+                    args.buffer_minutes.unwrap_or(0),
+                    api::hk_now(),
+                )
+                .map_err(mcp_error)?;
+                Ok(serde_json::to_string_pretty(&trip).unwrap_or_else(|_| "{}".to_string()))
+            }
             other => Err(mcp_error(format!(
-                "unknown access mode '{other}'; use airport-express, in-town-checkin or airport-bus"
+                "unknown access mode '{other}'; use airport-express, airport-express-status, in-town-checkin, airport-bus or trip"
             ))),
         }
     }
@@ -1164,6 +1237,36 @@ impl HkiaServer {
                 }))
                 .unwrap_or_else(|_| "{}".to_string()))
             }
+            ["access", "ael", "status"] => {
+                let status = self.access.ael_status().await.map_err(mcp_error)?;
+                Ok(serde_json::to_string_pretty(&status).unwrap_or_else(|_| "{}".to_string()))
+            }
+            ["access", "ael", station] => {
+                let station = access::parse_station(station).ok_or_else(|| {
+                    mcp_error(format!(
+                        "unknown AEL station '{station}'; use HOK, KOW, TSY, AIR or AWE"
+                    ))
+                })?;
+                let response = self
+                    .access
+                    .ael(station, access::AelDirection::default_for(station))
+                    .await
+                    .map_err(mcp_error)?;
+                Ok(serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".to_string()))
+            }
+            ["access", "checkin", airline] => {
+                let response = access::checkin(airline);
+                Ok(serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".to_string()))
+            }
+            ["access", "bus", route] => {
+                let direction = access::BusDirection::Both;
+                let mut response = access::bus_with_direction(Some(route), direction)
+                    .map_err(mcp_error)?;
+                for route in response.routes.clone() {
+                    response.live.extend(self.access.bus_live(&route, direction).await);
+                }
+                Ok(serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".to_string()))
+            }
             _ => Err(mcp_error(format!("unknown resource URI: {uri}"))),
         }
     }
@@ -1185,7 +1288,7 @@ impl ServerHandler for HkiaServer {
         )
         .with_server_info(Implementation::new("hkia", "0.1.0"))
         .with_instructions(
-            "Live Hong Kong International Airport (HKG) flight data. All times are Hong Kong time (UTC+8). Resources: hkia://board/today/departures, hkia://board/today/arrivals, hkia://alerts/today.",
+            "Live Hong Kong International Airport (HKG) flight data. All times are Hong Kong time (UTC+8). Resources: hkia://board/today/departures, hkia://board/today/arrivals, hkia://alerts/today, hkia://access/ael/status, hkia://access/ael/HOK, hkia://access/checkin/CX, hkia://access/bus/A11.",
         )
     }
 
@@ -1203,6 +1306,24 @@ impl ServerHandler for HkiaServer {
                 .with_mime_type("application/json"),
             Resource::new("hkia://alerts/today", "HKG disruption alerts today")
                 .with_description("Cancellations and 15+ minute delays across both boards")
+                .with_mime_type("application/json"),
+            Resource::new("hkia://access/ael/status", "Airport Express line status")
+                .with_description("MTR Next Train delay flag for HOK and AIR")
+                .with_mime_type("application/json"),
+            Resource::new("hkia://access/ael/HOK", "Airport Express at HOK")
+                .with_description(
+                    "Replace HOK with KOW, TSY, AIR or AWE for live departures, fares and journey times",
+                )
+                .with_mime_type("application/json"),
+            Resource::new("hkia://access/checkin/CX", "In-town check-in for CX")
+                .with_description(
+                    "Replace CX with an airline IATA/ICAO code for dated MTR check-in hours",
+                )
+                .with_mime_type("application/json"),
+            Resource::new("hkia://access/bus/A11", "Airport bus A11")
+                .with_description(
+                    "Replace A11 with an A-route for dated windows, fares and live ETAs",
+                )
                 .with_mime_type("application/json"),
         ];
         Ok(ListResourcesResult::with_all_items(resources))
