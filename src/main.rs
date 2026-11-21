@@ -398,9 +398,12 @@ struct RunwayArgs {
     /// Show locally observed runway switches instead of the live status
     #[arg(long)]
     history: bool,
-    /// Maximum history rows; 0 shows all
+    /// Maximum history rows or days; 0 shows all
     #[arg(short, long, default_value_t = 20)]
     limit: usize,
+    /// With --history, group switches by local date
+    #[arg(long)]
+    daily: bool,
 }
 
 #[derive(Args)]
@@ -633,6 +636,21 @@ async fn run_access(cli: &Cli, args: &AccessArgs) -> Result<()> {
 async fn run_runway(cli: &Cli, args: &RunwayArgs) -> Result<()> {
     if args.history {
         let store = open_store(cli)?;
+        if args.daily {
+            let days = store.runway_daily(args.limit)?;
+            if cli.json {
+                print_json(&json!({
+                    "generatedAt": api::hk_now().to_rfc3339_opts(SecondsFormat::Secs, false),
+                    "count": days.len(),
+                    "days": days,
+                }))?;
+            } else if cli.csv {
+                print!("{}", runway::daily_csv(&days, !cli.no_header)?);
+            } else {
+                print!("{}", runway::daily_table(&days));
+            }
+            return Ok(());
+        }
         let changes = store.runway_history(args.limit)?;
         if cli.json {
             print_json(&json!({

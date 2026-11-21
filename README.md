@@ -521,11 +521,23 @@ Every observed switch is also written to the local SQLite store, so
 hkia runway --history
 hkia runway --history --limit 50 --json
 hkia runway --history --csv
+hkia runway --history --daily
+```
+
+`--daily` groups the rows by local date and shows how many switches were seen
+that day with the first and last arrival/departure runway (`--limit` then caps
+the number of days).
+
+```
+Observed runway switches by day  |  1 day(s)  |  local store
+DATE        SWITCHES  FIRST        LAST
+2026-11-22  1         07C/07R      07C/07R
 ```
 
 There is no public historical runway feed; the history only covers periods when
 `hkia watch` was running, and a switch is recorded once per change, not per
-poll.
+poll. The same rows are available to agents as the `hkia://runway/history`
+resource (last 20 switches).
 
 ## MCP
 
@@ -693,6 +705,7 @@ Watchlist and history tools use the local SQLite store and config, so the same
 | `hkia://access/checkin/CX` | Dated in-town check-in hours (use any airline code) |
 | `hkia://access/bus/A11` | Dated A-route windows and fares plus live ETAs (use any route) |
 | `hkia://runway/status` | Official ATIS runway in use and airport wind |
+| `hkia://runway/history` | Locally observed runway switches, last 20 |
 
 Resources support read and the legacy subscribe/unsubscribe flow. Subscriptions
 poll every 30 seconds and emit `notifications/resources/updated` when the

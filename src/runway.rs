@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use crate::access::Source;
 use crate::api::{hk_now, hk_offset};
-use crate::store::RunwayChange;
+use crate::store::{RunwayChange, RunwayDay};
 
 pub const ATIS_URL: &str = "https://atis.cad.gov.hk/ATIS/ATISweb/atis.php";
 pub const ATIS_SOURCE: &str = "https://www.hkatc.gov.hk/";
@@ -455,6 +455,54 @@ pub fn history_table(changes: &[RunwayChange]) -> String {
     output
 }
 
+pub fn daily_table(days: &[RunwayDay]) -> String {
+    if days.is_empty() {
+        return "No runway switches recorded yet. Run `hkia watch` to observe them.\n".to_string();
+    }
+    let mut output = format!(
+        "Observed runway switches by day  |  {} day(s)  |  local store\n",
+        days.len()
+    );
+    output.push_str("DATE        SWITCHES  FIRST        LAST\n");
+    for day in days {
+        let first = format!("{}/{}", day.first_arrival, day.first_departure);
+        let last = format!("{}/{}", day.last_arrival, day.last_departure);
+        output.push_str(&format!(
+            "{:<11} {:<9} {:<12} {}\n",
+            day.date, day.switches, first, last
+        ));
+    }
+    output
+}
+
+pub fn daily_csv(days: &[RunwayDay], header: bool) -> Result<String> {
+    let mut writer = csv::Writer::from_writer(Vec::new());
+    if header {
+        writer.write_record([
+            "date",
+            "switches",
+            "first_arrival",
+            "first_departure",
+            "last_arrival",
+            "last_departure",
+        ])?;
+    }
+    for day in days {
+        writer.write_record([
+            day.date.clone(),
+            day.switches.to_string(),
+            day.first_arrival.clone(),
+            day.first_departure.clone(),
+            day.last_arrival.clone(),
+            day.last_departure.clone(),
+        ])?;
+    }
+    let bytes = writer
+        .into_inner()
+        .map_err(|error| anyhow!("writing CSV: {error}"))?;
+    String::from_utf8(bytes).map_err(|error| anyhow!("CSV was not UTF-8: {error}"))
+}
+
 pub fn history_csv(changes: &[RunwayChange], header: bool) -> Result<String> {
     let mut writer = csv::Writer::from_writer(Vec::new());
     if header {
@@ -875,6 +923,34 @@ mod tests {
         assert!(csv.starts_with("observed_at,arrival,departure"));
         assert!(csv.contains("25R,25C"));
         assert_eq!(history_csv(&changes, false).unwrap().lines().count(), 2);
+
+        let days = vec![
+            RunwayDay {
+                date: "2026-11-22".to_string(),
+                switches: 2,
+                first_arrival: "07C".to_string(),
+                first_departure: "07R".to_string(),
+                last_arrival: "25R".to_string(),
+                last_departure: "25C".to_string(),
+            },
+            RunwayDay {
+                date: "2026-11-23".to_string(),
+                switches: 1,
+                first_arrival: "07L".to_string(),
+                first_departure: "07C".to_string(),
+                last_arrival: "07L".to_string(),
+                last_departure: "07C".to_string(),
+            },
+        ];
+        let table = daily_table(&days);
+        assert!(table.contains("2 day(s)"));
+        assert!(table.contains("2026-11-22  2"));
+        assert!(table.contains("25R/25C"));
+        assert!(daily_table(&[]).contains("No runway switches"));
+        let csv = daily_csv(&days, true).unwrap();
+        assert!(csv.starts_with("date,switches,first_arrival"));
+        assert!(csv.contains("2026-11-23,1,07L,07C,07L,07C"));
+        assert_eq!(daily_csv(&days, false).unwrap().lines().count(), 2);
     }
 
     #[test]

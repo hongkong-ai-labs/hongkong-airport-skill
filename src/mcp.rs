@@ -1305,6 +1305,14 @@ impl HkiaServer {
                 let response = access::checkin(airline);
                 Ok(serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".to_string()))
             }
+            ["runway", "history"] => {
+                let changes = self.store.runway_history(20).map_err(mcp_error)?;
+                Ok(serde_json::to_string_pretty(&json!({
+                    "count": changes.len(),
+                    "changes": changes,
+                }))
+                .unwrap_or_else(|_| "{}".to_string()))
+            }
             ["runway", "status"] => {
                 let status = runway::fetch().await.map_err(mcp_error)?;
                 Ok(serde_json::to_string_pretty(&status).unwrap_or_else(|_| "{}".to_string()))
@@ -1341,7 +1349,7 @@ impl ServerHandler for HkiaServer {
         )
         .with_server_info(Implementation::new("hkia", "0.1.0"))
         .with_instructions(
-            "Live Hong Kong International Airport (HKG) flight data. All times are Hong Kong time (UTC+8). Resources: hkia://board/today/departures, hkia://board/today/arrivals, hkia://alerts/today, hkia://access/ael/status, hkia://access/ael/HOK, hkia://access/checkin/CX, hkia://access/bus/A11, hkia://runway/status.",
+            "Live Hong Kong International Airport (HKG) flight data. All times are Hong Kong time (UTC+8). Resources: hkia://board/today/departures, hkia://board/today/arrivals, hkia://alerts/today, hkia://access/ael/status, hkia://access/ael/HOK, hkia://access/checkin/CX, hkia://access/bus/A11, hkia://runway/status, hkia://runway/history.",
         )
     }
 
@@ -1376,6 +1384,11 @@ impl ServerHandler for HkiaServer {
             Resource::new("hkia://runway/status", "Runway in use at HKG")
                 .with_description(
                     "Official CAD ATIS arrival and departure runway with airport wind",
+                )
+                .with_mime_type("application/json"),
+            Resource::new("hkia://runway/history", "Observed runway switches")
+                .with_description(
+                    "Locally observed arrival/departure runway changes, last 20 (from watch)",
                 )
                 .with_mime_type("application/json"),
             Resource::new("hkia://access/bus/A11", "Airport bus A11")
