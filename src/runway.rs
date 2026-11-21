@@ -455,6 +455,35 @@ pub fn history_table(changes: &[RunwayChange]) -> String {
     output
 }
 
+/// Serialise the live status with the newest locally observed switch attached,
+/// so one payload answers what is in use now and when it last changed.
+pub fn status_json(
+    status: &RunwayStatus,
+    last_change: Option<&RunwayChange>,
+) -> Result<serde_json::Value> {
+    let mut value = serde_json::to_value(status)?;
+    value["last_observed"] = serde_json::to_value(last_change)?;
+    Ok(value)
+}
+
+pub fn last_change_line(last_change: Option<&RunwayChange>) -> String {
+    match last_change {
+        Some(change) => {
+            let stamp = change
+                .observed_at
+                .get(0..16)
+                .unwrap_or(&change.observed_at)
+                .replace('T', " ");
+            format!(
+                "\nLast observed switch: {stamp}  arrivals {}  departures {}\n",
+                change.arrival, change.departure
+            )
+        }
+        None => "\nLast observed switch: none recorded yet; run `hkia watch` to collect them.\n"
+            .to_string(),
+    }
+}
+
 pub fn daily_table(days: &[RunwayDay]) -> String {
     if days.is_empty() {
         return "No runway switches recorded yet. Run `hkia watch` to observe them.\n".to_string();

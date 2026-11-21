@@ -48,6 +48,10 @@ toml = "1.2.2"
 tower-http = { version = "0.7", features = ["cors"] }
 uuid = { version = "1", features = ["v4"] }
 
+[dev-dependencies]
+chrono = "0.4"
+rusqlite = { version = "0.43.0", features = ["bundled"] }
+
 [profile.release]
 strip = "symbols"
 lto = "thin"

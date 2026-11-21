@@ -602,6 +602,14 @@ struct WeatherArgs {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+struct RunwayHistoryArgs {
+    #[schemars(
+        description = "Maximum switches to return, newest first. Default 20; 0 returns every stored switch."
+    )]
+    limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
 struct AirportAccessArgs {
     #[schemars(
         description = "Access mode: airport-express (live AEL trains), airport-express-status (delay flag), in-town-checkin (dated MTR hours), airport-bus (dated A-route info plus live ETAs when route is set) or trip (latest AEL departure for a flight)"
@@ -1152,7 +1160,31 @@ impl HkiaServer {
     )]
     async fn get_runway_status(&self) -> Result<String, ErrorData> {
         let status = runway::fetch().await.map_err(mcp_error)?;
-        Ok(serde_json::to_string_pretty(&status).unwrap_or_else(|_| "{}".to_string()))
+        let last_change = self
+            .store
+            .runway_history(1)
+            .ok()
+            .and_then(|changes| changes.into_iter().next());
+        let value = runway::status_json(&status, last_change.as_ref()).map_err(mcp_error)?;
+        Ok(serde_json::to_string_pretty(&value).unwrap_or_else(|_| "{}".to_string()))
+    }
+
+    #[tool(
+        description = "Get the runway switches observed locally while `hkia watch` was running, newest first, with the arrival/departure runway pair and the time it was seen. This is a local observation log, not an official record; use get_runway_status for the runway in use now."
+    )]
+    async fn get_runway_history(
+        &self,
+        Parameters(args): Parameters<RunwayHistoryArgs>,
+    ) -> Result<String, ErrorData> {
+        let changes = self
+            .store
+            .runway_history(args.limit.unwrap_or(20))
+            .map_err(mcp_error)?;
+        Ok(serde_json::to_string_pretty(&json!({
+            "count": changes.len(),
+            "changes": changes,
+        }))
+        .unwrap_or_else(|_| "{}".to_string()))
     }
 
     #[tool(

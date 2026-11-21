@@ -266,12 +266,16 @@ crosswind for the arrival runway. The source is the official CAD ATIS page on
   and `wind_favours` applies the AIP rule. Say the runway is not confirmed and
   do not present the favoured runway as the runway in use. If both feeds fail,
   report the error.
+- The live output also shows the last switch this machine observed
+  (`last_observed` in JSON, null if none), so you can say how long the current
+  runway has held. It is local observation, not part of the ATIS.
 - `hkia watch` prints and notifies when the runway changes; `--no-runway`
   disables that check. Each observed switch is stored in SQLite, and
   `hkia runway --history [--limit N] [--daily]` lists them oldest first, or
   grouped per day with the switch count and first/last runway. History only
   covers periods when `watch` was running; it is not an official record. The
-  last 20 switches are also exposed as `hkia://runway/history`.
+  same rows are available as `get_runway_history` (`limit`, newest first,
+  default 20) and as the `hkia://runway/history` resource (last 20).
 
 ## Watchlist and notifications
 
@@ -376,8 +380,10 @@ MCP tools:
   `in-town-checkin`, `airport-bus`, `trip` (`station`, `direction`, `airline`,
   `route`, `time`, `date`, `terminal`, `buffer_minutes`, `no_live`)
 - `get_weather` — current Hong Kong Observatory warnings
-- `get_runway_status` — runway in use for arrivals/departures, ATIS wind and
-  wind components, no arguments
+- `get_runway_status` — runway in use for arrivals/departures, ATIS wind, wind
+  components and the last locally observed switch, no arguments
+- `get_runway_history` — locally observed switches, newest first; optional
+  `limit` (default 20, 0 returns all)
 
 Most flight tools take `date`, `direction`, `cargo`, and `lang`; check the tool
 schema for exact parameter names.
