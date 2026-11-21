@@ -316,7 +316,9 @@ The local SQLite store is at `$HKIA_DATA_DIR/hkia.db`,
 observations. Events are appended only when status, delay, gate, terminal, belt,
 or stand changes. `history` shows what this machine observed, not an official airport audit trail.
 The same applies to `hkia runway --history`, which stores one row per observed
-runway switch. Data older than 90 days is pruned opportunistically.
+runway switch. Data older than `--keep-days` (default 90) is pruned
+opportunistically; `watch` starts with a one-line summary of the stored
+history, and `alerts` prints the last observed switch with the live runway.
 
 ## MCP
 

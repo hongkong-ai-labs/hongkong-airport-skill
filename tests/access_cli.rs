@@ -113,6 +113,47 @@ fn runway_history_daily_reports_seeded_days() {
 }
 
 #[test]
+fn keep_days_controls_how_much_history_is_pruned() {
+    let db = temp_path("retention.db");
+    let config = temp_path("retention.toml");
+    let (ok, _, stderr) = run_with(&db, &config, &["runway", "--history"]);
+    assert!(ok, "creating the store failed: {stderr}");
+
+    let (today, _) = hk_today_and_yesterday();
+    let old = (today - chrono::Duration::days(200)).to_string();
+    let today = today.to_string();
+    let connection = rusqlite::Connection::open(&db).expect("open seeded store");
+    connection
+        .execute_batch(&format!(
+            "INSERT INTO runway_changes (observed_at, arrival, departure) VALUES
+             ('{old}T09:15:00+08:00', '07C', '07R'),
+             ('{today}T05:05:00+08:00', '07L', '07C');"
+        ))
+        .expect("seed runway changes");
+    drop(connection);
+
+    let (ok, stdout, stderr) = run_with(
+        &db,
+        &config,
+        &["--json", "runway", "--history", "--keep-days", "365"],
+    );
+    assert!(ok, "history with long retention failed: {stderr}");
+    let value: serde_json::Value = serde_json::from_str(&stdout).expect("history JSON");
+    assert_eq!(value["count"], 2);
+    assert_eq!(value["changes"][0]["arrival"], "07C");
+
+    let (ok, stdout, stderr) = run_with(
+        &db,
+        &config,
+        &["--json", "runway", "--history", "--keep-days", "90"],
+    );
+    assert!(ok, "history with default retention failed: {stderr}");
+    let value: serde_json::Value = serde_json::from_str(&stdout).expect("pruned history JSON");
+    assert_eq!(value["count"], 1);
+    assert_eq!(value["changes"][0]["arrival"], "07L");
+}
+
+#[test]
 fn checkin_json_has_static_source_metadata() {
     let (ok, stdout, stderr) = run(&["--json", "access", "checkin", "--airline", "CX"]);
     assert!(ok, "checkin failed: {stderr}");

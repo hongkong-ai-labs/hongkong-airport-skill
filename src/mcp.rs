@@ -163,18 +163,24 @@ pub async fn run(
     cache_ttl: u64,
     db_path: Option<PathBuf>,
     config_path: Option<PathBuf>,
+    keep_days: i64,
 ) -> Result<()> {
     let client = Arc::new(Client::new(Duration::from_secs(cache_ttl))?);
     match args.transport {
         McpTransport::Stdio => {
             eprintln!("hkia MCP server listening on stdio");
-            let server = HkiaServer::new(client, db_path.as_deref(), config_path.as_deref())?;
+            let server = HkiaServer::new(
+                client,
+                db_path.as_deref(),
+                config_path.as_deref(),
+                keep_days,
+            )?;
             let service = server.serve(stdio()).await?;
             service.waiting().await?;
             Ok(())
         }
-        McpTransport::Http => serve_http(args, client, db_path, config_path).await,
-        McpTransport::Sse => serve_sse(args, client, db_path, config_path).await,
+        McpTransport::Http => serve_http(args, client, db_path, config_path, keep_days).await,
+        McpTransport::Sse => serve_sse(args, client, db_path, config_path, keep_days).await,
     }
 }
 
@@ -183,6 +189,7 @@ async fn serve_http(
     client: Arc<Client>,
     db_path: Option<PathBuf>,
     config_path: Option<PathBuf>,
+    keep_days: i64,
 ) -> Result<()> {
     if !args.path.starts_with('/') {
         bail!("--path must start with '/'");
@@ -219,8 +226,13 @@ async fn serve_http(
             let db_path = db_path.clone();
             let config_path = config_path.clone();
             move || {
-                HkiaServer::new(client.clone(), db_path.as_deref(), config_path.as_deref())
-                    .map_err(|error| std::io::Error::other(error.to_string()))
+                HkiaServer::new(
+                    client.clone(),
+                    db_path.as_deref(),
+                    config_path.as_deref(),
+                    keep_days,
+                )
+                .map_err(|error| std::io::Error::other(error.to_string()))
             }
         },
         LocalSessionManager::default().into(),
@@ -279,9 +291,15 @@ async fn serve_sse(
     client: Arc<Client>,
     db_path: Option<PathBuf>,
     config_path: Option<PathBuf>,
+    keep_days: i64,
 ) -> Result<()> {
     let state = SseState {
-        server: HkiaServer::new(client, db_path.as_deref(), config_path.as_deref())?,
+        server: HkiaServer::new(
+            client,
+            db_path.as_deref(),
+            config_path.as_deref(),
+            keep_days,
+        )?,
         sessions: Arc::new(Mutex::new(HashMap::new())),
     };
     let auth = AuthConfig {
@@ -701,12 +719,13 @@ impl HkiaServer {
         client: Arc<Client>,
         db_path: Option<&Path>,
         config_path: Option<&Path>,
+        keep_days: i64,
     ) -> Result<Self> {
         let store = Arc::new(match db_path {
             Some(path) => Store::open(path)?,
             None => Store::open_default()?,
         });
-        let _ = store.prune(90);
+        let _ = store.prune(keep_days);
         Ok(Self {
             client,
             fresh: Arc::new(Client::new(Duration::ZERO)?),
@@ -869,7 +888,17 @@ impl HkiaServer {
             None
         };
         let runway = if args.include_runway.unwrap_or(true) {
-            runway::fetch().await.ok()
+            match runway::fetch().await {
+                Ok(status) => {
+                    let last_change = self
+                        .store
+                        .runway_history(1)
+                        .ok()
+                        .and_then(|changes| changes.into_iter().next());
+                    runway::status_json(&status, last_change.as_ref()).ok()
+                }
+                Err(_) => None,
+            }
         } else {
             None
         };

@@ -468,20 +468,43 @@ pub fn status_json(
 
 pub fn last_change_line(last_change: Option<&RunwayChange>) -> String {
     match last_change {
-        Some(change) => {
-            let stamp = change
-                .observed_at
-                .get(0..16)
-                .unwrap_or(&change.observed_at)
-                .replace('T', " ");
-            format!(
-                "\nLast observed switch: {stamp}  arrivals {}  departures {}\n",
-                change.arrival, change.departure
-            )
-        }
+        Some(change) => format!(
+            "\nLast observed switch: {}  arrivals {}  departures {}\n",
+            short_stamp(&change.observed_at),
+            change.arrival,
+            change.departure
+        ),
         None => "\nLast observed switch: none recorded yet; run `hkia watch` to collect them.\n"
             .to_string(),
     }
+}
+
+/// One startup line for `watch`: how much history exists and what it ended on.
+pub fn history_summary_line(changes: &[RunwayChange]) -> String {
+    let Some(last) = changes.last() else {
+        return "Runway history: none recorded yet; switches are added while watch runs.\n"
+            .to_string();
+    };
+    let since = changes
+        .first()
+        .map(|first| short_stamp(&first.observed_at))
+        .unwrap_or_default();
+    let switches = if changes.len() == 1 {
+        "switch"
+    } else {
+        "switches"
+    };
+    format!(
+        "Runway history: {} {switches} since {since}; last {}/{} at {}\n",
+        changes.len(),
+        last.arrival,
+        last.departure,
+        short_stamp(&last.observed_at)
+    )
+}
+
+fn short_stamp(raw: &str) -> String {
+    raw.get(0..16).unwrap_or(raw).replace('T', " ")
 }
 
 pub fn daily_table(days: &[RunwayDay]) -> String {
@@ -980,6 +1003,34 @@ mod tests {
         assert!(csv.starts_with("date,switches,first_arrival"));
         assert!(csv.contains("2026-11-23,1,07L,07C,07L,07C"));
         assert_eq!(daily_csv(&days, false).unwrap().lines().count(), 2);
+    }
+
+    #[test]
+    fn summarises_recorded_history_for_watch_startup() {
+        let changes = vec![
+            RunwayChange {
+                observed_at: "2026-11-21T22:10:00+08:00".to_string(),
+                arrival: "07C".to_string(),
+                departure: "07R".to_string(),
+            },
+            RunwayChange {
+                observed_at: "2026-11-22T09:30:00+08:00".to_string(),
+                arrival: "25R".to_string(),
+                departure: "25C".to_string(),
+            },
+        ];
+        let line = history_summary_line(&changes);
+        assert!(
+            line.contains("Runway history: 2 switches since 2026-11-21 22:10"),
+            "{line}"
+        );
+        assert!(line.contains("last 25R/25C at 2026-11-22 09:30"), "{line}");
+        let single = history_summary_line(&changes[1..]);
+        assert!(single.contains("1 switch since"), "{single}");
+        assert!(history_summary_line(&[]).contains("none recorded"));
+        assert!(
+            last_change_line(changes.last()).contains("Last observed switch: 2026-11-22 09:30")
+        );
     }
 
     #[test]
