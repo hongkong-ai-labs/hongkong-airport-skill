@@ -1,0 +1,55 @@
+[package]
+name = "hongkong-airport-skill"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.89"
+description = "Live Hong Kong International Airport flight data as a CLI and an MCP server"
+license = "MIT"
+repository = "https://github.com/hongkong-ai-labs/hongkong-airport-skill"
+readme = "README.md"
+keywords = ["hong-kong", "hkia", "hkg", "flights", "mcp"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "hkia"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+axum = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive"] }
+csv = "1.4.0"
+futures = "0.3"
+notify-rust = "4.19.0"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+rmcp = { version = "3.11", features = [
+    "server",
+    "macros",
+    "transport-io",
+    "transport-streamable-http-server",
+    "schemars",
+] }
+rusqlite = { version = "0.43.0", features = ["bundled"] }
+schemars = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = [
+    "macros",
+    "rt-multi-thread",
+    "io-std",
+    "net",
+    "signal",
+    "sync",
+    "time",
+] }
+tokio-util = "0.7"
+toml = "1.2.2"
+tower-http = { version = "0.7", features = ["cors"] }
+uuid = { version = "1", features = ["v4"] }
+
+[profile.release]
+strip = "symbols"
+lto = "thin"
+codegen-units = 1
+panic = "abort"

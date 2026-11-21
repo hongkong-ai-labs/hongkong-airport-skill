@@ -1,0 +1,72 @@
+[
+  {
+    "date": "2026-11-20",
+    "arrival": false,
+    "cargo": false,
+    "lastUpdatedTime": "2026-11-20T23:59:00+08:00",
+    "list": [
+      {
+        "time": "23:00",
+        "flight": [{ "no": "ZZ 999", "airline": "ZZZ" }],
+        "status": "Dep 23:10",
+        "statusCode": null,
+        "destination": ["LHR"],
+        "terminal": "T1",
+        "aisle": "A",
+        "gate": "1"
+      }
+    ]
+  },
+  {
+    "date": "2026-11-21",
+    "arrival": false,
+    "cargo": false,
+    "lastUpdatedTime": "2026-11-21T20:00:00+08:00",
+    "list": [
+      {
+        "time": "23:00",
+        "flight": [{ "no": "CX 251", "airline": "CPA" }],
+        "status": "Dep 00:00 (22/11/2026)",
+        "statusCode": null,
+        "destination": ["LHR"],
+        "terminal": "T1",
+        "aisle": "C",
+        "gate": "30"
+      },
+      {
+        "time": "00:15",
+        "flight": [
+          { "no": "NH 814", "airline": "ANA" },
+          { "no": "NZ 4144", "airline": "ANZ" },
+          { "no": "UA 7932", "airline": "UAL" }
+        ],
+        "status": "Est at 00:35",
+        "statusCode": null,
+        "destination": ["HND"],
+        "terminal": "T1",
+        "aisle": "E",
+        "gate": "48"
+      },
+      {
+        "time": "00:10",
+        "flight": [{ "no": "HX 307", "airline": "CRK" }],
+        "status": "Cancelled",
+        "statusCode": null,
+        "destination": ["PEK"],
+        "terminal": "T1",
+        "aisle": "D",
+        "gate": ""
+      },
+      {
+        "time": "04:15",
+        "flight": [{ "no": "UO 623", "airline": "HKE" }],
+        "status": "Dep 04:30",
+        "statusCode": null,
+        "destination": ["HND"],
+        "terminal": "T1",
+        "aisle": "E",
+        "gate": "12"
+      }
+    ]
+  }
+]

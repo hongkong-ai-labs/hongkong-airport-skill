@@ -1,0 +1,28 @@
+# Data attributions
+
+## Airport reference data
+
+`data/airports.json` is derived from **OurAirports**:
+
+- Source: https://davidmegginson.github.io/ourairports-data/airports.csv
+- Project: https://ourairports.com/data/
+- License: public domain (as stated by the OurAirports data page)
+
+Only IATA code, airport name, municipality, and ISO country are retained.
+
+## Airline reference data
+
+`data/airlines.json` is derived from **OpenFlights**:
+
+- Source: https://raw.githubusercontent.com/jpatokal/openflights/master/data/airlines.dat
+- Project: https://openflights.org/data.html
+- License: Open Database License (ODbL) 1.0 —
+  https://opendatacommons.org/licenses/odbl/1-0/
+
+Only active ICAO designator and airline name are retained. The derived airline
+lookup table is made available under the same ODbL terms.
+
+## Flight data
+
+Flight data is fetched at runtime from the Hong Kong International Airport public
+flight-information service. It is not bundled with this project.

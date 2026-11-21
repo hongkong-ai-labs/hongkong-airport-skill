@@ -1,0 +1,26 @@
+services:
+  hkia:
+    build: .
+    image: hkia:local
+    command:
+      - mcp
+      - --transport
+      - http
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8787"
+    ports:
+      - "8787:8787"
+    environment:
+      HKIA_DATA_DIR: /data
+      HKIA_CONFIG: /config/config.toml
+      HKIA_AUTH_TOKEN: ${HKIA_AUTH_TOKEN:-}
+    volumes:
+      - hkia-data:/data
+      - hkia-config:/config
+    restart: unless-stopped
+
+volumes:
+  hkia-data:
+  hkia-config:
