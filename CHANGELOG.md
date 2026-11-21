@@ -8,6 +8,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `hkia access ael`, `checkin` and `bus`: live Airport Express next trains from
+  the MTR Next Train API, dated in-town check-in hours for participating
+  airlines, and dated HKIA A-route bus destinations, fares and airport
+  departure windows. All support JSON/CSV; static facts carry `checked_on` and
+  source URLs.
+- MCP tool `get_airport_access` for the same live AEL and dated check-in/bus
+  reference data.
 - Manual no-Node skill installation, a community Rust `skills-cli` path, and a
   run-mode overview covering CLI, JSON, CSV, watch, Docker and MCP transports.
 - MCP client setup examples for Claude Code, Codex, Cursor, authenticated HTTP

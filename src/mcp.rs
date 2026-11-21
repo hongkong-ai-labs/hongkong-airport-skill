@@ -39,6 +39,7 @@ use serde_json::json;
 use tokio_util::sync::CancellationToken;
 use tower_http::cors::CorsLayer;
 
+use crate::access;
 use crate::api::{
     self, Client, Direction, Flight, FlightFilter, SortKey, build_alerts, compute_stats,
     fetch_flights,
@@ -373,6 +374,7 @@ pub struct HkiaServer {
     fresh: Arc<Client>,
     store: Arc<Store>,
     weather: Arc<WeatherClient>,
+    access: Arc<access::AccessClient>,
     config_path: Option<PathBuf>,
     subscriptions: Arc<Mutex<HashMap<String, tokio::task::JoinHandle<()>>>>,
 }
@@ -561,6 +563,28 @@ struct WeatherArgs {
     lang: Option<String>,
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+struct AirportAccessArgs {
+    #[schemars(
+        description = "Access mode: airport-express (live AEL trains), in-town-checkin (dated MTR hours) or airport-bus (dated A-route info)"
+    )]
+    mode: String,
+    #[schemars(description = "AEL station: HOK, KOW, TSY, AIR or AWE. Default HOK.")]
+    station: Option<String>,
+    #[schemars(
+        description = "AEL direction: to-airport, from-airport or both. Inferred from the station when omitted."
+    )]
+    direction: Option<String>,
+    #[schemars(
+        description = "Airline IATA/ICAO code or name for in-town check-in, e.g. CX, CPA or Cathay Pacific"
+    )]
+    airline: Option<String>,
+    #[schemars(
+        description = "Airport bus route for airport-bus mode, e.g. A11; omit for all routes"
+    )]
+    route: Option<String>,
+}
+
 fn mcp_error(error: impl std::fmt::Display) -> ErrorData {
     ErrorData::internal_error(error.to_string(), None)
 }
@@ -622,6 +646,7 @@ impl HkiaServer {
             fresh: Arc::new(Client::new(Duration::ZERO)?),
             store,
             weather: Arc::new(WeatherClient::new()?),
+            access: Arc::new(access::AccessClient::new(Duration::from_secs(20))?),
             config_path: config_path.map(Path::to_path_buf),
             subscriptions: Arc::new(Mutex::new(HashMap::new())),
         })
@@ -1054,6 +1079,56 @@ impl HkiaServer {
             .await
             .map_err(mcp_error)?;
         Ok(serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".to_string()))
+    }
+
+    #[tool(
+        description = "Get airport access for HKG: live Airport Express trains, dated MTR in-town check-in hours for an airline, or dated HKIA A-route bus destinations, fares and airport departure windows. Check-in and bus data carry checked_on and source fields; they are reference data, not live availability."
+    )]
+    async fn get_airport_access(
+        &self,
+        Parameters(args): Parameters<AirportAccessArgs>,
+    ) -> Result<String, ErrorData> {
+        let mode = args.mode.trim().to_ascii_lowercase().replace('_', "-");
+        match mode.as_str() {
+            "airport-express" | "ael" | "express" => {
+                let station = access::parse_station(args.station.as_deref().unwrap_or("HOK"))
+                    .ok_or_else(|| {
+                        mcp_error(format!(
+                            "unknown AEL station '{}'; use HOK, KOW, TSY, AIR or AWE",
+                            args.station.as_deref().unwrap_or("HOK")
+                        ))
+                    })?;
+                let direction = match args.direction.as_deref() {
+                    Some(value) => access::AelDirection::parse(value).ok_or_else(|| {
+                        mcp_error(format!(
+                            "unknown AEL direction '{value}'; use to-airport, from-airport or both"
+                        ))
+                    })?,
+                    None => access::AelDirection::default_for(station),
+                };
+                let response = self
+                    .access
+                    .ael(station, direction)
+                    .await
+                    .map_err(mcp_error)?;
+                Ok(serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".to_string()))
+            }
+            "in-town-checkin" | "in-town-check-in" | "checkin" | "check-in" => {
+                let airline = args
+                    .airline
+                    .as_deref()
+                    .ok_or_else(|| mcp_error("airline is required for in-town check-in lookups"))?;
+                let response = access::checkin(airline);
+                Ok(serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".to_string()))
+            }
+            "airport-bus" | "bus" | "buses" => {
+                let response = access::bus(args.route.as_deref()).map_err(mcp_error)?;
+                Ok(serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".to_string()))
+            }
+            other => Err(mcp_error(format!(
+                "unknown access mode '{other}'; use airport-express, in-town-checkin or airport-bus"
+            ))),
+        }
     }
 }
 

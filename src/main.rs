@@ -1,3 +1,4 @@
+mod access;
 mod analytics;
 mod api;
 mod mcp;
@@ -67,7 +68,7 @@ struct Cli {
     #[arg(long, global = true, value_enum, default_value_t = ColorMode::Auto)]
     color: ColorMode,
 
-    /// Cache HKIA responses for N seconds (0 disables)
+    /// Cache API responses for N seconds (0 disables)
     #[arg(long, global = true, default_value_t = 20)]
     cache_ttl: u64,
 
@@ -105,6 +106,8 @@ enum Command {
     Stats(StatsArgs),
     /// Show the observed status/gate timeline for a flight
     History(HistoryArgs),
+    /// Airport Express trains, in-town check-in and airport buses
+    Access(AccessArgs),
     /// Manage the targeted watchlist config
     Watchlist(WatchlistArgs),
     /// Run the MCP server over stdio, streamable HTTP or SSE
@@ -326,6 +329,46 @@ struct HistoryArgs {
 }
 
 #[derive(Args)]
+struct AccessArgs {
+    #[command(subcommand)]
+    command: AccessCommand,
+}
+
+#[derive(Subcommand)]
+enum AccessCommand {
+    /// Live Airport Express departures from an MTR station
+    Ael(AelArgs),
+    /// In-town check-in hours and eligibility for an airline
+    Checkin(CheckinArgs),
+    /// Airport A-route buses, fares and airport departure hours
+    Bus(BusArgs),
+}
+
+#[derive(Args)]
+struct AelArgs {
+    /// MTR station: HOK, KOW, TSY, AIR or AWE (default HOK)
+    #[arg(long, default_value = "HOK")]
+    station: String,
+    /// Direction; defaults to to-airport from HOK/KOW/TSY and from-airport at AIR/AWE
+    #[arg(long, value_enum)]
+    direction: Option<access::AelDirection>,
+}
+
+#[derive(Args)]
+struct CheckinArgs {
+    /// Airline IATA or ICAO code, or name (e.g. CX, CPA, Cathay Pacific)
+    #[arg(long)]
+    airline: String,
+}
+
+#[derive(Args)]
+struct BusArgs {
+    /// Restrict to one route, e.g. A11
+    #[arg(long)]
+    route: Option<String>,
+}
+
+#[derive(Args)]
 struct WatchlistArgs {
     #[command(subcommand)]
     command: WatchlistCommand,
@@ -420,6 +463,9 @@ async fn main() -> Result<()> {
         Command::History(ref args) => {
             run_history(&cli, args).await?;
         }
+        Command::Access(ref args) => {
+            run_access(&cli, args).await?;
+        }
         Command::Watchlist(ref args) => {
             run_watchlist(&cli, args)?;
         }
@@ -431,6 +477,52 @@ async fn main() -> Result<()> {
                 cli.config.clone(),
             )
             .await?;
+        }
+    }
+    Ok(())
+}
+
+async fn run_access(cli: &Cli, args: &AccessArgs) -> Result<()> {
+    match &args.command {
+        AccessCommand::Ael(ael) => {
+            let station = access::parse_station(&ael.station).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "unknown station '{}'; use HOK, KOW, TSY, AIR or AWE",
+                    ael.station
+                )
+            })?;
+            let direction = ael
+                .direction
+                .unwrap_or_else(|| access::AelDirection::default_for(station));
+            let client = access::AccessClient::new(Duration::from_secs(cli.cache_ttl))?;
+            let response = client.ael(station, direction).await?;
+            if cli.json {
+                print_json(&serde_json::to_value(&response)?)?;
+            } else if cli.csv {
+                print!("{}", access::ael_csv(&response, !cli.no_header)?);
+            } else {
+                print!("{}", access::ael_table(&response));
+            }
+        }
+        AccessCommand::Checkin(checkin) => {
+            let response = access::checkin(&checkin.airline);
+            if cli.json {
+                print_json(&serde_json::to_value(&response)?)?;
+            } else if cli.csv {
+                print!("{}", access::checkin_csv(&response, !cli.no_header)?);
+            } else {
+                print!("{}", access::checkin_table(&response));
+            }
+        }
+        AccessCommand::Bus(bus) => {
+            let response = access::bus(bus.route.as_deref())?;
+            if cli.json {
+                print_json(&serde_json::to_value(&response)?)?;
+            } else if cli.csv {
+                print!("{}", access::bus_csv(&response, !cli.no_header)?);
+            } else {
+                print!("{}", access::bus_table(&response));
+            }
         }
     }
     Ok(())

@@ -1,6 +1,6 @@
 ---
 name: hongkong-airport-skill
-description: Live Hong Kong International Airport (HKG) flight information — departures, arrivals, delays, cancellations, terminal/gate/check-in/aisle/baggage guidance, disruption alerts, watchlists, historical on-time analytics, and HKO weather context. Use for any question about HKG flights, real-time status, airport delays, terminals, or on-time performance.
+description: Live Hong Kong International Airport (HKG) flight information — departures, arrivals, delays, cancellations, terminal/gate/check-in/aisle/baggage guidance, disruption alerts, watchlists, historical on-time analytics, HKO weather context, and airport access (Airport Express, in-town check-in, A-route buses). Use for any question about HKG flights, real-time status, airport delays, terminals, on-time performance, or getting to and from the airport.
 license: MIT
 ---
 
@@ -19,6 +19,7 @@ Use it when the user asks about:
 - on-time performance for a day or a historical date range
 - watching a board for changes, or a persistent timeline of what was observed
 - weather warnings affecting airport operations
+- Airport Express trains, in-town check-in, or airport A-route buses
 
 ## Before first use
 
@@ -121,6 +122,13 @@ hkia departures --airport LHR --terminal T1 --airline CPA --limit 20 --json
 hkia departures --status disrupted --csv
 hkia departures --lang zh_HK --limit 10 --json
 hkia departures --cargo --limit 10 --json
+
+# Airport access
+hkia access ael --station HOK --json
+hkia access ael --station AIR --direction from-airport --json
+hkia access checkin --airline CX --json
+hkia access bus --route A11 --json
+hkia access bus --json
 ```
 
 Run `hkia <command> --help` for per-command filters such as `--flight`,
@@ -185,6 +193,36 @@ Delay minutes are computed from the airport's free-text status against the
 scheduled time. English, Traditional Chinese, and Simplified Chinese status
 terms are recognised. They are not airline cause codes and do not distinguish
 weather, crew, slot, or maintenance reasons. `guidance` is always English.
+
+## Airport access
+
+Use `hkia access` for getting to or from HKG. It is separate from the flight
+commands and keeps the same `--json` / `--csv` conventions.
+
+```bash
+hkia access ael --station HOK
+hkia access ael --station KOW --direction both --json
+hkia access checkin --airline CX
+hkia access checkin --airline CPA --json
+hkia access bus --route A11
+hkia access bus --csv
+```
+
+- `ael` is **live** from the MTR Next Train API. Stations: `HOK`, `KOW`, `TSY`,
+  `AIR`, `AWE`. Direction is `to-airport`, `from-airport`, or `both`; it
+  defaults from the station. Each response has `trains`, plus `service` with
+  journey times, first/last windows, fares, `checked_on`, and source URLs.
+- `checkin` is a **dated snapshot** of MTR's published in-town check-in list.
+  It matches IATA (`CX`), ICAO (`CPA`) or name. Returns station hours,
+  eligibility, baggage limits, `source`, and `checked_on`. It is not live
+  availability and does not confirm a specific flight is accepted.
+- `bus` is a **dated snapshot** of the 29 HKIA A-routes. Returns destination,
+  operator, adult fare, and the **from-airport** departure window. It does not
+  include city-to-airport hours, frequency, or live bus ETAs.
+
+The reference snapshot was checked on `2026-11-22`. Always pass through
+`checked_on` and the source URL, and tell the user to confirm with MTR, the
+airline, or the bus operator before travel.
 
 ## Watchlist and notifications
 
@@ -280,10 +318,12 @@ MCP tools:
 - `get_flight_history` — locally observed status/gate/belt timeline
 - `get_historical_stats` — historical range analytics
 - `wait_for_changes` — long-poll for new recorded changes; pass the returned timestamp as `after`
+- `get_airport_access` — live AEL trains, dated in-town check-in hours, or
+  dated A-route bus info (`mode`, `station`, `direction`, `airline`, `route`)
 - `get_weather` — current Hong Kong Observatory warnings
 
-Most tools take `date`, `direction`, `cargo`, and `lang`; check the tool schema
-for exact parameter names.
+Most flight tools take `date`, `direction`, `cargo`, and `lang`; check the tool
+schema for exact parameter names.
 
 MCP resources:
 
@@ -312,6 +352,10 @@ are polled every 30 seconds. Prefer `wait_for_changes` for push-style clients.
 - The feed is published per calendar day. Future dates may be empty or missing;
   querying tomorrow early in the day can legitimately return no board.
 - Cargo flights live on a separate board: pass `--cargo` / `"cargo": true`.
+- Never invent an Airport Express time, check-in hour, bus route, fare, or
+  departure window. If a lookup fails, say so. In-town check-in and bus data
+  are dated snapshots, not live availability; quote `checked_on`. Bus hours are
+  airport departure windows only, not city-to-airport times.
 - The live feed may include the previous day's tail; this tool selects the
   requested date. Keep request rates reasonable; responses cache for 20 seconds
   by default (`--cache-ttl 0` disables, `watch` is uncached).
@@ -320,5 +364,6 @@ are polled every 30 seconds. Prefer `wait_for_changes` for push-style clients.
   not claim to quote tower instructions. You can report published delays,
   cancellations, weather warnings, and gate changes, and clearly label any
   outside audio/transcript as unverified and unofficial.
-- Reference data comes from OurAirports (public domain) and OpenFlights (ODbL);
-  see `NOTICE`.
+- Flight reference data comes from OurAirports (public domain) and OpenFlights
+  (ODbL). Airport access facts come from MTR and HKIA public pages. See
+  `NOTICE`.

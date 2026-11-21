@@ -26,3 +26,28 @@ lookup table is made available under the same ODbL terms.
 
 Flight data is fetched at runtime from the Hong Kong International Airport public
 flight-information service. It is not bundled with this project.
+
+## Airport access data
+
+Airport Express train times are fetched at runtime from the **MTR Next Train**
+API published through data.gov.hk:
+
+- Endpoint: https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php
+- Dataset: https://data.gov.hk/en-data/dataset/mtr-data2-nexttrain-data
+- Provider: MTR Corporation Limited
+
+The following reference facts are bundled as dated snapshots, checked on
+**2026-11-22**. They are factual timetable/fare/service information, not a copy
+of a database, and remain subject to the providers' terms:
+
+- Airport Express journey times, first/last trains, frequency and fares:
+  https://www.mtr.com.hk/en/customer/services/timetable_index.html,
+  https://www.mtr.com.hk/en/customer/services/train_service_index.html and
+  https://www.mtr.com.hk/en/customer/tickets/tf_index.html
+- In-town check-in participating airlines, station hours and conditions:
+  https://www.mtr.com.hk/en/customer/services/complom_checkin.html
+- Airport A-route bus destinations, fares, operators and airport departure
+  windows: https://www.hongkongairport.com/en/transport/to-from-airport/public-buses.page
+
+MTR and HKIA are not affiliated with this project and do not endorse it. Verify
+hours, fares and availability with the provider before travel.
