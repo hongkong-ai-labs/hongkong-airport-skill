@@ -508,6 +508,12 @@ the AIP rule (runway 07 when the tailwind is 5 knots or less). The wind favour
 is an indication, not the runway in use, and the command never invents one. If
 both the ATIS and the HKO feed fail, it returns an error instead.
 
+In table mode, `hkia runway` also prints the most recent switch this machine
+recorded while `watch` was running, so the current runway can be read together
+with when it last changed. JSON carries the same as `last_observed`, which is
+`null` until something has been observed; that line is local observation, not
+part of the official ATIS.
+
 `hkia watch` polls the runway with the rest of the board and prints, notifies
 and webhooks when the arrival or departure runway changes (`--no-runway` skips
 those checks, `--no-ael` skips the AEL status). `hkia alerts` includes the
@@ -682,7 +688,8 @@ the key.
 | `get_historical_stats` | Multi-day range analytics with airline/route/hour/weekday groups |
 | `wait_for_changes` | Long-poll for new recorded changes; use the returned timestamp as the next `after` |
 | `get_weather` | Current Hong Kong Observatory warnings |
-| `get_runway_status` | Runway in use for arrivals and departures, ATIS wind and wind components |
+| `get_runway_status` | Runway in use for arrivals and departures, ATIS wind, wind components and last observed switch |
+| `get_runway_history` | Locally observed runway switches, newest first, with an optional `limit` (default 20, 0 for all) |
 | `get_airport_access` | Live AEL trains and status, trip planning, dated in-town check-in hours, or A-route bus data with live ETAs |
 
 Watchlist and history tools use the local SQLite store and config, so the same

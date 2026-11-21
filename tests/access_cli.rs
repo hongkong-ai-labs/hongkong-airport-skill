@@ -16,13 +16,17 @@ fn temp_path(name: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(format!("hkia-test-{}-{unique}-{name}", std::process::id()))
 }
 
-fn run(args: &[&str]) -> (bool, String, String) {
+fn run_with(
+    db: &std::path::Path,
+    config: &std::path::Path,
+    args: &[&str],
+) -> (bool, String, String) {
     let output = hkia()
         .args(args)
         .arg("--db")
-        .arg(temp_path("cli.db"))
+        .arg(db)
         .arg("--config")
-        .arg(temp_path("cli.toml"))
+        .arg(config)
         .output()
         .expect("run hkia");
     (
@@ -30,6 +34,76 @@ fn run(args: &[&str]) -> (bool, String, String) {
         String::from_utf8_lossy(&output.stdout).to_string(),
         String::from_utf8_lossy(&output.stderr).to_string(),
     )
+}
+
+fn run(args: &[&str]) -> (bool, String, String) {
+    run_with(&temp_path("cli.db"), &temp_path("cli.toml"), args)
+}
+
+#[test]
+fn runway_history_daily_reports_seeded_days() {
+    let db = temp_path("runway-daily.db");
+    let config = temp_path("runway-daily.toml");
+    let (ok, _, stderr) = run_with(&db, &config, &["runway", "--history"]);
+    assert!(ok, "creating the store failed: {stderr}");
+
+    // Seed through SQLite so the test stays offline and deterministic. Dates
+    // are relative to today so the 90-day prune never removes the rows.
+    let offset = chrono::FixedOffset::east_opt(8 * 3600).expect("UTC+8 offset");
+    let today = chrono::Utc::now().with_timezone(&offset).date_naive();
+    let yesterday = today.pred_opt().expect("previous day");
+    let connection = rusqlite::Connection::open(&db).expect("open seeded store");
+    connection
+        .execute_batch(&format!(
+            "INSERT INTO runway_changes (observed_at, arrival, departure) VALUES
+             ('{yesterday}T09:15:00+08:00', '07C', '07R'),
+             ('{yesterday}T11:40:00+08:00', '25R', '25C'),
+             ('{today}T05:05:00+08:00', '07L', '07C');"
+        ))
+        .expect("seed runway changes");
+    drop(connection);
+
+    let (ok, stdout, stderr) = run_with(&db, &config, &["runway", "--history", "--daily"]);
+    assert!(ok, "daily history failed: {stderr}");
+    assert!(stdout.contains("2 day(s)"), "{stdout}");
+    let older = stdout
+        .find(&format!("{yesterday}  2"))
+        .unwrap_or_else(|| panic!("missing yesterday row: {stdout}"));
+    let newest = stdout
+        .find(&format!("{today}  1"))
+        .unwrap_or_else(|| panic!("missing today row: {stdout}"));
+    assert!(older < newest, "expected oldest day first: {stdout}");
+    assert!(stdout.contains("07C/07R"), "{stdout}");
+    assert!(stdout.contains("25R/25C"), "{stdout}");
+
+    let (ok, stdout, stderr) =
+        run_with(&db, &config, &["--json", "runway", "--history", "--daily"]);
+    assert!(ok, "daily JSON failed: {stderr}");
+    let value: serde_json::Value = serde_json::from_str(&stdout).expect("daily JSON");
+    assert_eq!(value["count"], 2);
+    assert_eq!(value["days"][0]["date"], yesterday.to_string());
+    assert_eq!(value["days"][0]["switches"], 2);
+    assert_eq!(value["days"][0]["first_departure"], "07R");
+    assert_eq!(value["days"][0]["last_arrival"], "25R");
+    assert_eq!(value["days"][1]["date"], today.to_string());
+    assert_eq!(value["days"][1]["switches"], 1);
+
+    let (ok, stdout, stderr) = run_with(&db, &config, &["--csv", "runway", "--history", "--daily"]);
+    assert!(ok, "daily CSV failed: {stderr}");
+    assert!(
+        stdout
+            .starts_with("date,switches,first_arrival,first_departure,last_arrival,last_departure"),
+        "{stdout}"
+    );
+
+    let (ok, stdout, stderr) = run_with(
+        &db,
+        &config,
+        &["runway", "--history", "--daily", "--limit", "1"],
+    );
+    assert!(ok, "limited daily history failed: {stderr}");
+    assert!(stdout.contains("1 day(s)"), "{stdout}");
+    assert!(!stdout.contains(&yesterday.to_string()), "{stdout}");
 }
 
 #[test]
@@ -346,6 +420,17 @@ fn mcp_routes_access_modes_and_resources() {
     assert!(names.contains(&"get_airport_access"), "tools: {names:?}");
     assert!(names.contains(&"get_alerts"), "tools: {names:?}");
     assert!(names.contains(&"get_runway_status"), "tools: {names:?}");
+    assert!(names.contains(&"get_runway_history"), "tools: {names:?}");
+    let history_tool = tools["result"]["tools"]
+        .as_array()
+        .expect("tools list")
+        .iter()
+        .find(|tool| tool["name"] == "get_runway_history")
+        .expect("get_runway_history tool");
+    assert!(
+        history_tool["inputSchema"]["properties"]["limit"].is_object(),
+        "get_runway_history schema: {history_tool}"
+    );
     let alerts_tool = tools["result"]["tools"]
         .as_array()
         .expect("tools list")

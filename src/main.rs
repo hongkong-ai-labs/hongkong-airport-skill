@@ -666,14 +666,27 @@ async fn run_runway(cli: &Cli, args: &RunwayArgs) -> Result<()> {
         return Ok(());
     }
     let status = runway::fetch().await?;
+    let last_change = last_observed_switch(cli);
     if cli.json {
-        print_json(&serde_json::to_value(&status)?)?;
+        print_json(&runway::status_json(&status, last_change.as_ref())?)?;
     } else if cli.csv {
         print!("{}", runway::runway_csv(&status, !cli.no_header)?);
     } else {
         print!("{}", runway::runway_table(&status));
+        print!("{}", runway::last_change_line(last_change.as_ref()));
     }
     Ok(())
+}
+
+/// Read the newest recorded switch without creating the database as a side
+/// effect; a status query on a machine that never ran `watch` stays read-only.
+fn last_observed_switch(cli: &Cli) -> Option<store::RunwayChange> {
+    let path = cli.db.clone().unwrap_or_else(store::db_path);
+    if !path.exists() {
+        return None;
+    }
+    let store = Store::open(&path).ok()?;
+    store.runway_history(1).ok()?.into_iter().next()
 }
 
 async fn run_board(cli: &Cli, common: &CommonArgs, direction: Direction) -> Result<()> {

@@ -8,6 +8,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `hkia runway` and the MCP tool `get_runway_status` now also report the most
+  recently observed switch (`last_observed` in JSON), and the MCP tool
+  `get_runway_history` returns the observed switches with an optional `limit`.
+  The CLI history and daily output are covered by an integration test against
+  a seeded store.
 - `hkia access ael`, `status`, `checkin`, `bus` and `trip`: live Airport
   Express next trains and delay status from the MTR Next Train API, dated
   in-town check-in hours for participating airlines, all 30 HKIA A-routes in
