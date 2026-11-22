@@ -6,6 +6,7 @@ mod notify;
 mod reference;
 mod render;
 mod runway;
+mod sources;
 mod store;
 mod watchlist;
 mod weather;
